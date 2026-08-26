@@ -2,9 +2,20 @@
   publish = "."
 
 [[headers]]
-for = "/*"
-[headers.values]
-  X-Content-Type-Options = "nosniff"
-  X-Frame-Options = "DENY"
-  Referrer-Policy = "strict-origin-when-cross-origin"
-  Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy = "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
+
+[[redirects]]
+  from = "/score"
+  to = "/#score"
+  status = 301
+
+[[redirects]]
+  from = "/diagnostic"
+  to = "/#diagnostic"
+  status = 301
