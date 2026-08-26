@@ -19,3 +19,28 @@
   from = "/diagnostic"
   to = "/#diagnostic"
   status = 301
+
+[[redirects]]
+  from = "/resources"
+  to = "/resources.html"
+  status = 200
+
+[[redirects]]
+  from = "/new-store-readiness"
+  to = "/new-store-operational-readiness.html"
+  status = 200
+
+[[redirects]]
+  from = "/off-premise-accuracy"
+  to = "/off-premise-line-accuracy.html"
+  status = 200
+
+[[redirects]]
+  from = "/kds-workflow"
+  to = "/labor-kds-workflow.html"
+  status = 200
+
+[[redirects]]
+  from = "/reset"
+  to = "/profit-control-reset.html"
+  status = 200
