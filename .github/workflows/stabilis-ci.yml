@@ -12,6 +12,7 @@ on:
       - 'privacy.html'
       - 'terms.html'
       - 'assets/**'
+      - 'netlify/**'
       - 'operator-intelligence/**'
       - '_redirects'
       - 'netlify.toml'
@@ -30,6 +31,7 @@ on:
       - 'privacy.html'
       - 'terms.html'
       - 'assets/**'
+      - 'netlify/**'
       - 'operator-intelligence/**'
       - '_redirects'
       - 'netlify.toml'
@@ -68,6 +70,7 @@ jobs:
           node --check assets/demo-data.js
           node --check assets/demo.js
           node --check assets/app.js
+          node --check assets/ask-stabilis.js
       - name: Static production build contract
         working-directory: .
         run: |
@@ -80,6 +83,8 @@ jobs:
           test -s privacy.html
           test -s terms.html
           test -s assets/stabilis.css
+          test -s assets/ask-stabilis.js
+          test -s netlify/functions/ask-stabilis.mts
           test -s stabilis-release-marker.txt
       - name: Lint
         run: ruff check src scripts tests
