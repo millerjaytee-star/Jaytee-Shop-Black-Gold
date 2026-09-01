@@ -1,0 +1,1 @@
+Evidence required before final handoff: CI success, preview success, live Supabase security advisor, adversarial tenant test, post-merge Netlify READY state, production HTTP/header smoke checks, and verified Notion updates.

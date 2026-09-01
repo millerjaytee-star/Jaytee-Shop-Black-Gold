@@ -1,0 +1,1 @@
+This file is populated conceptually by verified CI, preview, security and production results; it does not replace platform evidence.
