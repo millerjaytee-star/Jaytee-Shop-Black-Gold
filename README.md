@@ -1,42 +1,48 @@
-# Stabilis Ops Group — Operator Intelligence
+# Stabilis Ops Group + Stabilis Operator Intelligence™
 
-Stabilis is an operating-intelligence and execution platform for multi-unit businesses, initially focused on restaurants. The public website, fictional Harbor & Hearth demo, deterministic intelligence engine, analyst review controls, Supabase schema/migrations and Netlify deployment live in this repository.
+One maintainable Stabilis product combining the public website, Profit Leak Score™, fictional Operator Intelligence demo, customer authentication shell, deterministic intelligence engine, analyst-review controls, secure multi-tenant data architecture, action tracking, results/Verified Value, reports, GitHub, Netlify and Supabase.
 
-**Positioning:** Stabilize. Systemize. Scale.
+## Product promise
 
-**Product loop:** Data → Validate → Normalize → Calculate → Benchmark → Detect → Diagnose → Quantify → Prioritize → Review → Recommend → Assign → Execute → Verify → Measure → Learn.
+Stabilis is an operating intelligence system for multi-unit businesses. We identify where you're losing money, quantify the opportunity, tell your team what to fix, and track whether it actually gets fixed.
 
-## Repository structure
+**Stabilize. Systemize. Scale.**
 
-- `/index.html` — public Stabilis website and Profit Leak Score
-- `/operator-intelligence.html` — read-only Harbor & Hearth demo command center
-- `/operator-intelligence-report.html` — fictional Operator Intelligence Report v1 sample
-- `/login.html` — secure-app gate; does not fake authentication before live RLS validation
-- `/operator-intelligence/` — deterministic engine, application reference implementation, tests and Supabase migrations
-- `/docs/` — architecture, database, intelligence, deployment and release-gate documentation
+## Production surfaces
 
-## Local quality gate
+- Public website: `https://stabilis-ops-group.netlify.app`
+- Operator Intelligence demo: `/operator-intelligence`
+- Sample report: `/operator-intelligence-report`
+- Login: `/login`
+- Protected shell: `/app`
 
-```bash
-cd operator-intelligence
-python -m pip install -e ".[test,dev]"
-python scripts/generate_dataset.py
-pytest -q
-python -m compileall -q src scripts tests
-ruff check src scripts tests
-mypy src/application/security.py src/application/fiscal.py src/scoring/confidence.py src/scoring/priority.py src/metrics/engine.py
-```
+Harbor & Hearth is fictional demo data. Its controlled modeled recoverable opportunity is **$392,570.56**. This is not realized or guaranteed savings. Verified Value starts separately at $0 in the demo.
 
-## Netlify
+## Architecture
 
-The production static experience is connected to `main` on the Netlify project `stabilis-ops-group`. Static assets publish from the repository root. The secure authenticated/data application must not be simulated in the browser; it activates only after the dedicated Stabilis Supabase project passes the release gate.
+Public Netlify site -> Supabase Auth -> tenant-aware app -> private Stabilis Supabase -> deterministic calculation/validation engine -> analyst review -> customer outputs -> actions -> observed results -> Verified Value.
+
+AI may synthesize and explain already-calculated authorized facts. It must not invent financial truth, bypass authorization, modify raw facts silently, or mark its own value VERIFIED.
 
 ## Supabase
 
-Apply migrations in order from `operator-intelligence/supabase/migrations/` to a **dedicated Stabilis Supabase project**. Never reuse Concrete Motivation, MarketIQ or another unrelated project's database for Stabilis customer financial data.
+Dedicated project: `Stabilis Operator Intelligence` / `vpunfmwklwjefvchvmpn` / `us-east-2`.
 
-## Release safety
+Live negative-security tests passed for cross-tenant reads, cross-tenant writes, anonymous schema access, private storage isolation and released-report isolation. Current Supabase security advisor reports zero security lints after hardening.
 
-**REAL FINANCIAL DATA RELEASE GATE = BLOCKED** until live Supabase RLS, cross-tenant read/write, private storage, auth, report isolation, API authorization, logs, migration review and advisor checks pass.
+**REAL FINANCIAL DATA RELEASE GATE = BLOCKED** pending positive-path login/session/password-reset/invitation testing in the deployed application. Do not upload real restaurant financial data until that gate is explicitly changed to PASSED.
 
-The Harbor & Hearth demo is fictional. The controlled canonical modeled recoverable opportunity is **$392,570.56**. It is not verified savings. The HHR-07 overtime indicator is supporting evidence and must never be counted as a second financial opportunity.
+## Quality gate
+
+The GitHub workflow regenerates deterministic Harbor & Hearth fixtures, runs pytest, compiles Python, runs Ruff and type-checks the financial/security core with mypy. The HHR-07 overtime duplicate-count regression must remain protected; canonical demo opportunity = **$392,570.56**.
+
+## Local engine
+
+```bash
+cd operator-intelligence
+python scripts/generate_dataset.py
+pytest -q
+python scripts/run_analysis.py
+```
+
+See `docs/architecture.md`, `docs/database.md`, `docs/intelligence-engine.md`, `docs/security-release-gate.md`, `docs/operator-intelligence-v1.md`, and `docs/deployment.md`.
