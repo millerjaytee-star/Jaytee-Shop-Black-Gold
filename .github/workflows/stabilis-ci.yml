@@ -1,0 +1,51 @@
+name: Stabilis Quality Gate
+
+on:
+  pull_request:
+    paths:
+      - 'operator-intelligence/**'
+      - 'operator-intelligence.html'
+      - 'operator-intelligence-report.html'
+      - 'login.html'
+      - '_redirects'
+      - 'netlify.toml'
+      - '.github/workflows/stabilis-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'operator-intelligence/**'
+      - 'operator-intelligence.html'
+      - 'operator-intelligence-report.html'
+      - 'login.html'
+      - '_redirects'
+      - 'netlify.toml'
+      - '.github/workflows/stabilis-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: operator-intelligence
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: operator-intelligence/pyproject.toml
+      - name: Install
+        run: python -m pip install --upgrade pip && pip install -e ".[test,dev]"
+      - name: Generate deterministic Harbor & Hearth fixtures
+        run: python scripts/generate_dataset.py
+      - name: Unit and contract tests
+        run: pytest -q
+      - name: Compile check
+        run: python -m compileall -q src scripts tests
+      - name: Lint
+        run: ruff check src scripts tests
+      - name: Type check core calculation and security modules
+        run: mypy src/application/security.py src/application/fiscal.py src/scoring/confidence.py src/scoring/priority.py src/metrics/engine.py
