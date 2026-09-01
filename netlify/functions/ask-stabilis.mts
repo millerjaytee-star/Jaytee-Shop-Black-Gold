@@ -1,3 +1,5 @@
+import OpenAI from "openai";
+
 declare const Netlify: { env: { get(name: string): string | undefined } };
 
 type Json = Record<string, any>;
@@ -239,9 +241,7 @@ export default async (req: Request) => {
     return json({ ...result, query_id: queryId, model: "deterministic-guard", provider: "stabilis" });
   }
 
-  const baseUrl = env("OPENAI_BASE_URL");
-  const apiKey = env("OPENAI_API_KEY");
-  if (!baseUrl || !apiKey) {
+  if (!process.env.OPENAI_BASE_URL) {
     const queryId = await logQuery(token, orgId, locationId, cat, "provider_unavailable", [], Date.now() - started, "AI_GATEWAY_UNAVAILABLE");
     return json({ error: SAFE_FAILURE, query_id: queryId }, 503);
   }
@@ -264,22 +264,16 @@ Return ONLY JSON with keys: answer (string), confidence (HIGH|MEDIUM|LOW|INSUFFI
   const timer = setTimeout(() => controller.abort(), 25000);
   let modelJson: any;
   try {
-    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      signal: controller.signal,
-      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        model: MODEL,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: `QUESTION:\n${question}\n\nAUTHORIZED STABILIS CONTEXT:\n${JSON.stringify(context)}` },
-        ],
-      }),
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(`MODEL_${response.status}`);
-    const text = payload?.choices?.[0]?.message?.content;
+    const client = new OpenAI();
+    const completion = await client.chat.completions.create({
+      model: MODEL,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: `QUESTION:\n${question}\n\nAUTHORIZED STABILIS CONTEXT:\n${JSON.stringify(context)}` },
+      ],
+    }, { signal: controller.signal });
+    const text = completion.choices?.[0]?.message?.content;
     if (!text) throw new Error("EMPTY_MODEL_RESPONSE");
     modelJson = JSON.parse(text);
   } catch (error: any) {
@@ -320,4 +314,12 @@ Return ONLY JSON with keys: answer (string), confidence (HIGH|MEDIUM|LOW|INSUFFI
   return json({ ...result, query_id: queryId, model: MODEL, provider: PROVIDER });
 };
 
-export const config = { path: "/api/ask-stabilis" };
+export const config = {
+  path: "/api/ask-stabilis",
+  method: "POST",
+  rateLimit: {
+    windowLimit: 30,
+    windowSize: 60,
+    aggregateBy: ["ip", "domain"],
+  },
+};
