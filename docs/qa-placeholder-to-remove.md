@@ -1,0 +1,1 @@
+Release QA is performed through the Stabilis Quality Gate, preview deployments, Supabase security/adversarial checks and post-merge production smoke testing.
