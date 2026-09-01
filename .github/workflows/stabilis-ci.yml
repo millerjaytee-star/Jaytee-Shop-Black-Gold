@@ -99,10 +99,14 @@ jobs:
         env:
           STABILIS_RELEASE_BASE_URL: https://deploy-preview-${{ github.event.pull_request.number }}--stabilis-ops-group.netlify.app
           STABILIS_EXPECT_RELEASE_MARKER: stabilis-operator-intelligence-10x-20260901
-        run: python scripts/release_preview_qa.py
+        run: |
+          python scripts/release_preview_qa.py
+          python scripts/ask_stabilis_preview_qa.py
       - name: Netlify production browser QA
         if: github.event_name == 'push'
         env:
           STABILIS_RELEASE_BASE_URL: https://stabilis-ops-group.netlify.app
           STABILIS_EXPECT_RELEASE_MARKER: stabilis-operator-intelligence-10x-20260901
-        run: python scripts/release_preview_qa.py
+        run: |
+          python scripts/release_preview_qa.py
+          python scripts/ask_stabilis_preview_qa.py
