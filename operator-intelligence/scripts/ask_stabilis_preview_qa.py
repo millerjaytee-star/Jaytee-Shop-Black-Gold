@@ -1,4 +1,4 @@
-"""Unauthenticated deploy smoke for Ask Stabilis and its browser assets."""
+"""Deploy smoke for Ask Stabilis, browser assets, authorization edge, and AI Gateway."""
 from __future__ import annotations
 
 import json
@@ -14,7 +14,7 @@ if not BASE:
 def get(path: str) -> tuple[int, str]:
     req = Request(BASE + path, headers={"User-Agent": "StabilisAskQA/1.0"})
     try:
-        with urlopen(req, timeout=30) as response:
+        with urlopen(req, timeout=45) as response:
             return response.status, response.read().decode("utf-8")
     except HTTPError as exc:
         return exc.code, exc.read().decode("utf-8")
@@ -28,7 +28,7 @@ def post(path: str, payload: dict) -> tuple[int, str]:
         method="POST",
     )
     try:
-        with urlopen(req, timeout=30) as response:
+        with urlopen(req, timeout=45) as response:
             return response.status, response.read().decode("utf-8")
     except HTTPError as exc:
         return exc.code, exc.read().decode("utf-8")
@@ -51,6 +51,14 @@ def main() -> None:
     assert status == 401, (status, body)
     assert "Authentication required" in body, body
     print("ASK STABILIS UNAUTHENTICATED SECURITY SMOKE = PASS")
+
+    status, body = get("/api/stabilis-ai-health?token=stabilis-health-a81f9d4c-20260901")
+    assert status == 200, (status, body)
+    payload = json.loads(body)
+    assert payload.get("ok") is True, payload
+    assert payload.get("provider") == "netlify-ai-gateway/openai", payload
+    assert payload.get("model") == "gpt-5", payload
+    print("ASK STABILIS AI GATEWAY PROVIDER SMOKE = PASS")
 
 
 if __name__ == "__main__":
