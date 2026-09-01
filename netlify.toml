@@ -7,39 +7,56 @@
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-    Content-Security-Policy = "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://vpunfmwklwjefvchvmpn.supabase.co; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Content-Security-Policy = "default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://vpunfmwklwjefvchvmpn.supabase.co; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+
+[[headers]]
+  for = "/app*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/login*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600, must-revalidate"
+
+[[headers]]
+  for = "/stabilis-config.js"
+  [headers.values]
+    Cache-Control = "no-store"
 
 [[redirects]]
   from = "/score"
   to = "/#score"
   status = 301
-
 [[redirects]]
   from = "/diagnostic"
   to = "/#diagnostic"
   status = 301
-
 [[redirects]]
   from = "/resources"
   to = "/resources.html"
   status = 200
-
 [[redirects]]
   from = "/new-store-readiness"
   to = "/new-store-operational-readiness.html"
   status = 200
-
 [[redirects]]
   from = "/off-premise-accuracy"
   to = "/off-premise-line-accuracy.html"
   status = 200
-
 [[redirects]]
   from = "/kds-workflow"
   to = "/labor-kds-workflow.html"
   status = 200
-
 [[redirects]]
   from = "/reset"
   to = "/profit-control-reset.html"
