@@ -70,6 +70,7 @@ jobs:
           node --check assets/demo-data.js
           node --check assets/demo.js
           node --check assets/app.js
+          node --check assets/app-modules.js
           node --check assets/ask-stabilis.js
       - name: Static production build contract
         working-directory: .
@@ -83,6 +84,7 @@ jobs:
           test -s privacy.html
           test -s terms.html
           test -s assets/stabilis.css
+          test -s assets/app-modules.js
           test -s assets/ask-stabilis.js
           test -s netlify/functions/ask-stabilis.mts
           test -s stabilis-release-marker.txt
