@@ -1,10 +1,13 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-MIGRATION = ROOT / 'operator-intelligence/supabase/migrations/20260901164000_controlled_pilot_product_layer.sql'
+MIGRATION_DIR = ROOT / 'operator-intelligence/supabase/migrations'
 
 def text(name: str) -> str:
     return (ROOT / name).read_text()
+
+def migration_text() -> str:
+    return '\n'.join(p.read_text() for p in sorted(MIGRATION_DIR.glob('20260901164*.sql'))).lower()
 
 def test_public_home_is_product_first_and_financially_safe():
     home=text('index.html')
@@ -62,7 +65,7 @@ def test_netlify_security_and_clean_routes():
     assert 'no-store' in toml and 'https://vpunfmwklwjefvchvmpn.supabase.co' in toml
 
 def test_controlled_pilot_product_migration_contract():
-    sql=MIGRATION.read_text().lower()
+    sql=migration_text()
     for table in ['pilot_accounts','onboarding_progress','insight_feedback','operator_notes','usage_events','notification_preferences']:
         assert f'stabilis.{table}' in sql
     for fn in ['stabilis_workspace_payload','stabilis_record_usage_event','stabilis_submit_feedback','stabilis_add_operator_note','stabilis_update_onboarding_step']:
