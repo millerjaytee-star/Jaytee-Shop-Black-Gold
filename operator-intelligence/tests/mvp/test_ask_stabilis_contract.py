@@ -13,8 +13,10 @@ def test_ask_stabilis_is_server_side_and_authenticated():
     assert 'req.headers.get("authorization")' in fn
     assert 'supabase("/auth/v1/user"' in fn
     assert 'stabilis_intelligence_context' in fn
-    assert 'OPENAI_BASE_URL' in fn
-    assert 'OPENAI_API_KEY' in fn
+    assert 'import OpenAI from "openai"' in fn
+    assert 'new OpenAI()' in fn
+    assert 'chat.completions.create' in fn
+    assert 'process.env.OPENAI_BASE_URL' in fn
     assert 'service_role' not in fn.lower()
 
 
@@ -41,17 +43,26 @@ def test_ask_stabilis_prompt_injection_and_failure_states_exist():
     assert "OUTPUT_VALIDATION" in fn
 
 
-def test_ai_gateway_health_probe_is_explicit_and_rate_limited():
+def test_ai_gateway_health_probe_uses_supported_sdk_and_rate_limit():
     fn = read("netlify/functions/stabilis-ai-health.mts")
-    assert 'NETLIFY_AI_GATEWAY_BASE_URL' in fn
-    assert 'NETLIFY_AI_GATEWAY_KEY' in fn
-    assert 'OPENAI_BASE_URL' in fn
-    assert 'OPENAI_API_KEY' in fn
+    package = read("package.json")
+    assert 'import OpenAI from "openai"' in fn
+    assert 'new OpenAI()' in fn
+    assert 'chat.completions.create' in fn
+    assert 'process.env.OPENAI_BASE_URL' in fn
     assert 'STABILIS_AI_HEALTH_TOKEN' in fn
     assert 'rateLimit' in fn
     assert 'windowLimit: 5' in fn
     assert 'aggregateBy: ["ip", "domain"]' in fn
     assert 'No customer data is included.' in fn
+    assert '"openai": "7.8.0"' in package
+
+
+def test_ask_stabilis_has_reasonable_abuse_guardrail():
+    fn = read("netlify/functions/ask-stabilis.mts")
+    assert 'rateLimit' in fn
+    assert 'windowLimit: 30' in fn
+    assert 'windowSize: 60' in fn
 
 
 def test_ask_stabilis_client_has_loading_retry_feedback_and_scope():
