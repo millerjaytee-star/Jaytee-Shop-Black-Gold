@@ -41,6 +41,19 @@ def test_ask_stabilis_prompt_injection_and_failure_states_exist():
     assert "OUTPUT_VALIDATION" in fn
 
 
+def test_ai_gateway_health_probe_is_explicit_and_rate_limited():
+    fn = read("netlify/functions/stabilis-ai-health.mts")
+    assert 'NETLIFY_AI_GATEWAY_BASE_URL' in fn
+    assert 'NETLIFY_AI_GATEWAY_KEY' in fn
+    assert 'OPENAI_BASE_URL' in fn
+    assert 'OPENAI_API_KEY' in fn
+    assert 'STABILIS_AI_HEALTH_TOKEN' in fn
+    assert 'rateLimit' in fn
+    assert 'windowLimit: 5' in fn
+    assert 'aggregateBy: ["ip", "domain"]' in fn
+    assert 'No customer data is included.' in fn
+
+
 def test_ask_stabilis_client_has_loading_retry_feedback_and_scope():
     app = read("app.html")
     client = read("assets/ask-stabilis.js")
