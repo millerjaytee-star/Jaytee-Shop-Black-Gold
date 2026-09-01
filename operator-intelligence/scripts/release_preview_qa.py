@@ -98,12 +98,24 @@ def check_headers() -> None:
     print("Security headers: PASS")
 
 
+def ignorable_preview_console_error(text: str) -> bool:
+    """Ignore only Netlify's injected preview-toolbar frame being blocked by our CSP.
+
+    Production intentionally disallows third-party framing. The deploy-preview toolbar attempts
+    to inject app.netlify.com, so this console message proves the CSP is enforcing the intended
+    production boundary rather than representing an application defect.
+    """
+    return "Framing 'https://app.netlify.com/' violates" in text
+
+
 def attach_error_capture(page: Page, errors: list[str]) -> None:
     page.on("pageerror", lambda exc: errors.append(f"pageerror: {exc}"))
-    page.on(
-        "console",
-        lambda msg: errors.append(f"console:{msg.type}: {msg.text}") if msg.type == "error" else None,
-    )
+
+    def capture_console(msg) -> None:
+        if msg.type == "error" and not ignorable_preview_console_error(msg.text):
+            errors.append(f"console:{msg.type}: {msg.text}")
+
+    page.on("console", capture_console)
     page.on(
         "requestfailed",
         lambda req: errors.append(f"requestfailed: {req.method} {req.url} {req.failure}"),
