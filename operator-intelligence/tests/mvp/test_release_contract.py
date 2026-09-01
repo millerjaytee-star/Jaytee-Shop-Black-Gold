@@ -51,9 +51,14 @@ def test_public_demo_contract():
     assert 'supabaseUrl' in config and 'supabasePublishableKey' in config
     assert 'service_role' not in config.lower()
 
+    # Public home remains the sales/diagnostic surface; secure/demo routes are independently deployable.
+    assert 'Stabilize. Systemize. Scale.' in home
+    assert 'Profit Leak Score' in home
+    assert 'Book an Operations Conversation' in home
+    for required_surface in ['operator-intelligence.html', 'operator-intelligence-report.html', 'login.html', 'app.html']:
+        assert (REPO / required_surface).exists(), required_surface
+
     assert 'REAL FINANCIAL DATA RELEASE GATE = BLOCKED' in gate
-    for token in ['Stabilize. Systemize. Scale.', '/operator-intelligence', 'Profit Leak Score', '/sample-intelligence', '/login', 'stabilis-lead']:
-        assert token in home
 
 
 def test_full_schema_contract():
