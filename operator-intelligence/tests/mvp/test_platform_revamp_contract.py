@@ -46,8 +46,8 @@ def test_login_recovery_and_browser_key_contract():
     assert 'supabasePublishableKey' in config
 
 def test_public_trust_and_legal_pages_exist():
-    security=text('security.html');privacy=text('privacy.html');terms=text('terms.html')
-    assert 'Row Level Security' in security
+    security=text('security.html').lower();privacy=text('privacy.html').lower();terms=text('terms.html')
+    assert 'row level security' in security
     assert 'source, report and evidence' in security
     assert 'tenant-scoped' in privacy
     assert 'Modeled opportunity is not verified savings' in terms
@@ -65,7 +65,7 @@ def test_controlled_pilot_product_migration_contract():
     sql=MIGRATION.read_text().lower()
     for table in ['pilot_accounts','onboarding_progress','insight_feedback','operator_notes','usage_events','notification_preferences']:
         assert f'stabilis.{table}' in sql
-    for fn in ['stabilis_workspace_payload','stabilis_record_usage_event','stabilis_add_operator_note','stabilis_update_onboarding_step']:
+    for fn in ['stabilis_workspace_payload','stabilis_record_usage_event','stabilis_submit_feedback','stabilis_add_operator_note','stabilis_update_onboarding_step']:
         assert fn in sql
     assert 'counted_in_rollup=true' in sql.replace(' ','')
     assert 'opportunity_kind' in sql and "'primary'" in sql
