@@ -1,0 +1,11 @@
+{
+  "labor_pct": 31.5,
+  "food_cost_pct": 29.5,
+  "prime_cost_pct": 61.0,
+  "overtime_pct": 3.0,
+  "discount_pct": 2.0,
+  "comp_pct": 0.8,
+  "refund_pct": 0.5,
+  "inventory_variance_pct_sales": 0.8,
+  "minimum_months_for_high_confidence": 10
+}

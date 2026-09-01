@@ -1,0 +1,6 @@
+{
+  "labor": {"low": 0.50, "base": 0.65, "high": 0.80},
+  "food_control": {"low": 0.40, "base": 0.55, "high": 0.70},
+  "revenue": {"low": 0.15, "base": 0.25, "high": 0.35},
+  "discounts": {"low": 0.35, "base": 0.50, "high": 0.65}
+}
