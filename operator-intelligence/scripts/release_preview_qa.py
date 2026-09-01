@@ -99,12 +99,7 @@ def check_headers() -> None:
 
 
 def ignorable_preview_console_error(text: str) -> bool:
-    """Ignore only Netlify's injected preview-toolbar frame being blocked by our CSP.
-
-    Production intentionally disallows third-party framing. The deploy-preview toolbar attempts
-    to inject app.netlify.com, so this console message proves the CSP is enforcing the intended
-    production boundary rather than representing an application defect.
-    """
+    """Ignore only Netlify's injected preview-toolbar frame being blocked by our CSP."""
     return "Framing 'https://app.netlify.com/' violates" in text
 
 
@@ -155,10 +150,12 @@ def demo_deep_links(browser: Browser) -> None:
     page = context.new_page()
     errors: list[str] = []
     attach_error_capture(page, errors)
+    response = page.goto(f"{BASE}/operator-intelligence#command", wait_until="networkidle", timeout=45_000)
+    assert response is not None and response.status < 400
     for anchor in DEMO_HASHES:
-        response = page.goto(f"{BASE}/operator-intelligence#{anchor}", wait_until="networkidle", timeout=45_000)
-        assert response is not None and response.status < 400, anchor
-        page.wait_for_timeout(150)
+        page.evaluate("anchor => { location.hash = anchor; }", anchor)
+        page.wait_for_timeout(180)
+        assert page.url.endswith(f"#{anchor}"), (anchor, page.url)
         assert page.locator("body").inner_text().strip(), anchor
     text = page.locator("body").inner_text()
     assert "FICTIONAL DEMO DATA" in text
