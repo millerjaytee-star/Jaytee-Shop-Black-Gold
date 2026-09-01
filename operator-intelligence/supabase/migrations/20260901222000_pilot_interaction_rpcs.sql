@@ -66,7 +66,7 @@ begin
   where id=p_action_id;
   insert into stabilis.action_updates(organization_id,action_id,status,note,changed_by)
   values(p_organization_id,p_action_id,v_status,left(p_note,2000),auth.uid());
-  insert into stabilis.audit_events(organization_id,actor_id,action,entity_type,entity_id,old_state,new_state)
+  insert into stabilis.audit_events(organization_id,actor_id,action,entity_type,entity_id,previous_state,new_state)
   values(p_organization_id,auth.uid(),'ACTION_STATUS_UPDATED','action',p_action_id,jsonb_build_object('status',v_action.status),jsonb_build_object('status',v_status,'note',left(p_note,500)));
 end $$;
 revoke all on function public.stabilis_update_action_state(uuid,uuid,text,text) from public,anon;
