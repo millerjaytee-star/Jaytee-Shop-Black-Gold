@@ -82,3 +82,11 @@ jobs:
         run: ruff check src scripts tests
       - name: Type check core calculation and security modules
         run: mypy src/application/security.py src/application/fiscal.py src/scoring/confidence.py src/scoring/priority.py src/metrics/engine.py
+      - name: Install Chromium for deploy-preview browser QA
+        if: github.event_name == 'pull_request'
+        run: python -m playwright install --with-deps chromium
+      - name: Netlify deploy-preview browser QA
+        if: github.event_name == 'pull_request'
+        env:
+          STABILIS_RELEASE_BASE_URL: https://deploy-preview-${{ github.event.pull_request.number }}--stabilis-ops-group.netlify.app
+        run: python scripts/release_preview_qa.py
