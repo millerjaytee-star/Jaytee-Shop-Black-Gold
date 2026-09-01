@@ -1,0 +1,1 @@
+Branch `stabilis-10x-platform-revamp-20260901` contains the unified product revamp. Merge is permitted only after CI, preview, Supabase security and production smoke gates pass.
