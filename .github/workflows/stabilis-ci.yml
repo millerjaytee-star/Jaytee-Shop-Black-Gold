@@ -61,6 +61,7 @@ jobs:
         run: python scripts/generate_dataset.py
       - name: Full ingestion-to-report pipeline smoke
         run: |
+          mkdir -p outputs
           python scripts/run_analysis.py > outputs/ci-pipeline-smoke.json
           test -s outputs/validation.json
           test -s outputs/findings.json
@@ -68,7 +69,12 @@ jobs:
           test -s outputs/priorities.json
           test -s outputs/scores.json
           test -s outputs/operator_intelligence_report.md
-          grep -q '392570.56' outputs/ci-pipeline-smoke.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload=json.loads(Path('outputs/ci-pipeline-smoke.json').read_text())
+          assert round(float(payload['recoverable_total']),2)==392570.56, payload['recoverable_total']
+          PY
       - name: Unit, integration, financial and release contract tests
         run: pytest -q
       - name: Compile check
