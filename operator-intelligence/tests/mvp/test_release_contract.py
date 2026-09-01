@@ -13,11 +13,12 @@ def test_required_docs():
         assert (ROOT/p).resolve().exists(), p
 
 def test_public_demo_contract():
-    demo=(REPO/'operator-intelligence.html').read_text(); report=(REPO/'operator-intelligence-report.html').read_text(); login=(REPO/'login.html').read_text(); home=(REPO/'index.html').read_text()
+    demo=(REPO/'operator-intelligence.html').read_text(); report=(REPO/'operator-intelligence-report.html').read_text(); login=(REPO/'login.html').read_text(); home=(REPO/'index.html').read_text(); gate=(REPO/'docs/security-release-gate.md').read_text()
     assert 'FICTIONAL DEMO DATA' in demo and '$392,570.56' in demo and 'SUPPORTING · NOT COUNTED TWICE' in demo and 'VERIFIED STABILIS-ATTRIBUTABLE VALUE · $0' in demo
     for anchor in ['#locations','#opportunities','#hhr07','#labor','#food','#revenue','#actions','#results','#data','#reports']: assert anchor in demo
     assert 'Modeled Recoverable' in report and 'Verified Value' in report and '$392,570.56' in report
-    assert 'REAL FINANCIAL DATA RELEASE GATE = BLOCKED' in login
+    assert 'supabaseUrl' not in login and 'stabilis-config.js' in login
+    assert 'REAL FINANCIAL DATA RELEASE GATE = BLOCKED' in gate
     for token in ['Stabilize. Systemize. Scale.','/operator-intelligence','Profit Leak Score','/sample-intelligence','/login','stabilis-lead']: assert token in home
 
 def test_full_schema_contract():
@@ -28,5 +29,5 @@ def test_full_schema_contract():
     assert 'canonical_opportunity_rollup' in sql and "opportunity_kind = 'primary'" in sql and 'counted_in_rollup' in sql
     assert "'stabilis-reports','stabilis-reports',false" in sql and "'stabilis-evidence','stabilis-evidence',false" in sql
 
-def test_release_gate_stays_blocked_until_live_security():
+def test_release_gate_stays_blocked_until_positive_auth_validation():
     doc=(REPO/'docs/security-release-gate.md').read_text(); assert 'REAL FINANCIAL DATA RELEASE GATE = BLOCKED' in doc; assert '$392,570.56' in doc
