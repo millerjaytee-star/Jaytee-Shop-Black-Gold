@@ -5,6 +5,7 @@ from src.api.app import app
 ROOT = Path(__file__).resolve().parents[2]
 REPO = ROOT.parent
 MIG = ROOT / 'supabase/migrations/202609010003_full_platform_schema.sql'
+CUSTOMER_CONTEXT_MIG = ROOT / 'supabase/migrations/202609010004_public_customer_context.sql'
 
 
 def test_health_and_protection():
@@ -29,6 +30,7 @@ def test_public_demo_contract():
     demo = (REPO / 'operator-intelligence.html').read_text()
     report = (REPO / 'operator-intelligence-report.html').read_text()
     login = (REPO / 'login.html').read_text()
+    secure_app = (REPO / 'app.html').read_text()
     config = (REPO / 'stabilis-config.js').read_text()
     home = (REPO / 'index.html').read_text()
     gate = (REPO / 'docs/security-release-gate.md').read_text()
@@ -44,12 +46,25 @@ def test_public_demo_contract():
     assert 'Verified Value' in report
     assert '$392,570.56' in report
 
-    # Login must consume shared config rather than embed a project URL or privileged key.
+    # Browser surfaces consume shared config and never ship privileged credentials.
     assert 'stabilis-config.js' in login
+    assert 'stabilis-config.js' in secure_app
     assert 'https://vpunfmwklwjefvchvmpn.supabase.co' not in login
     assert 'service_role' not in login.lower()
+    assert 'service_role' not in secure_app.lower()
     assert 'supabaseUrl' in config and 'supabasePublishableKey' in config
     assert 'service_role' not in config.lower()
+
+    # Recovery and invitation flows must be consumable by the deployed UI.
+    assert "type==='recovery'" in login
+    assert '/auth/v1/recover' in login
+    assert "method:'PUT'" in login and '/auth/v1/user' in login
+    assert 'newPassword' in login and 'confirmPassword' in login
+    assert 'consumeAuthHash' in secure_app
+    assert "type==='invite'" in secure_app
+    assert 'grant_type=refresh_token' in secure_app
+    assert 'stabilis_my_organizations' in secure_app
+    assert 'stabilis_my_locations' in secure_app
 
     # Public home remains the sales/diagnostic surface; secure/demo routes are independently deployable.
     assert 'Stabilize. Systemize. Scale.' in home
@@ -58,7 +73,7 @@ def test_public_demo_contract():
     for required_surface in ['operator-intelligence.html', 'operator-intelligence-report.html', 'login.html', 'app.html']:
         assert (REPO / required_surface).exists(), required_surface
 
-    assert 'REAL FINANCIAL DATA RELEASE GATE = BLOCKED' in gate
+    assert 'CONTROLLED PILOT FINANCIAL DATA RELEASE GATE = PASSED' in gate
 
 
 def test_full_schema_contract():
@@ -80,7 +95,23 @@ def test_full_schema_contract():
     assert "'stabilis-evidence','stabilis-evidence',false" in sql
 
 
-def test_release_gate_stays_blocked_until_positive_auth_validation():
+def test_public_customer_context_contract():
+    sql = CUSTOMER_CONTEXT_MIG.read_text().lower()
+    assert 'security_invoker = true' in sql
+    assert 'public.stabilis_my_organizations' in sql
+    assert 'public.stabilis_my_locations' in sql
+    assert 'm.profile_id = auth.uid()' in sql
+    assert 'stabilis.can_access_location' in sql
+    assert 'revoke all' in sql and 'from public, anon' in sql
+    assert 'grant select' in sql and 'to authenticated' in sql
+
+
+def test_controlled_pilot_release_gate_is_closed_with_proof():
     doc = (REPO / 'docs/security-release-gate.md').read_text()
-    assert 'REAL FINANCIAL DATA RELEASE GATE = BLOCKED' in doc
+    assert 'CONTROLLED PILOT FINANCIAL DATA RELEASE GATE = PASSED' in doc
+    assert 'Session refresh using the refresh token: PASS' in doc
+    assert 'Invitation acceptance session: PASS' in doc
+    assert 'Active organization membership resolution: PASS' in doc
+    assert 'Direct cross-tenant organization-ID guess: PASS' in doc
+    assert 'Temporary QA users and tenant data: REMOVED' in doc
     assert '$392,570.56' in doc
