@@ -3,22 +3,36 @@ name: Stabilis Quality Gate
 on:
   pull_request:
     paths:
-      - 'operator-intelligence/**'
+      - 'index.html'
+      - 'app.html'
+      - 'login.html'
       - 'operator-intelligence.html'
       - 'operator-intelligence-report.html'
-      - 'login.html'
+      - 'security.html'
+      - 'privacy.html'
+      - 'terms.html'
+      - 'assets/**'
+      - 'operator-intelligence/**'
       - '_redirects'
       - 'netlify.toml'
+      - 'stabilis-config.js'
       - '.github/workflows/stabilis-ci.yml'
   push:
     branches: [main]
     paths:
-      - 'operator-intelligence/**'
+      - 'index.html'
+      - 'app.html'
+      - 'login.html'
       - 'operator-intelligence.html'
       - 'operator-intelligence-report.html'
-      - 'login.html'
+      - 'security.html'
+      - 'privacy.html'
+      - 'terms.html'
+      - 'assets/**'
+      - 'operator-intelligence/**'
       - '_redirects'
       - 'netlify.toml'
+      - 'stabilis-config.js'
       - '.github/workflows/stabilis-ci.yml'
 
 permissions:
@@ -41,10 +55,29 @@ jobs:
         run: python -m pip install --upgrade pip && pip install -e ".[test,dev]"
       - name: Generate deterministic Harbor & Hearth fixtures
         run: python scripts/generate_dataset.py
-      - name: Unit and contract tests
+      - name: Unit, integration, financial and release contract tests
         run: pytest -q
       - name: Compile check
         run: python -m compileall -q src scripts tests
+      - name: JavaScript syntax check
+        working-directory: .
+        run: |
+          node --check assets/public.js
+          node --check assets/demo-data.js
+          node --check assets/demo.js
+          node --check assets/app.js
+      - name: Static production build contract
+        working-directory: .
+        run: |
+          test -s index.html
+          test -s operator-intelligence.html
+          test -s operator-intelligence-report.html
+          test -s login.html
+          test -s app.html
+          test -s security.html
+          test -s privacy.html
+          test -s terms.html
+          test -s assets/stabilis.css
       - name: Lint
         run: ruff check src scripts tests
       - name: Type check core calculation and security modules
