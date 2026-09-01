@@ -34,8 +34,13 @@ The following migrations are intentionally retained in Supabase's audit history 
 - `release_smoke_seed_profile_upsert` — temporary QA profile helper.
 - `remove_release_smoke_seed_helpers` — removed the temporary QA helpers.
 - `remove_temporary_http_smoke_extension` — removed the temporary HTTP smoke capability.
+- `enable_auth_retest_http` — temporarily enabled database HTTP only to invoke the final release authentication smoke endpoint from inside the dedicated Supabase environment.
+- `release_auth_retest_seed_helpers` — temporary service-role-only QA tenant seed/cleanup RPCs for the final post-revamp authentication retest.
+- `release_auth_retest_seed_profile_upsert` — adjusted the temporary QA helper to coexist with the production auth profile trigger.
+- `remove_release_auth_retest_seed_helpers` — removed all final auth-retest QA helper RPCs.
+- `remove_auth_retest_http_extension` — removed the temporary database HTTP extension after the final authentication retest.
 
-The final production state therefore does **not** depend on those temporary helpers or the temporary HTTP extension.
+The final production state therefore does **not** depend on temporary QA helpers, public QA endpoints, or the temporary HTTP extension. The `release-auth-smoke` Edge Function is left in a locked `410 Gone` state with JWT verification restored after testing.
 
 ## Consistency rule
 
