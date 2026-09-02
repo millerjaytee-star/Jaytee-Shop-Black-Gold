@@ -76,38 +76,46 @@ def test_runtime_captures_actual_provider_usage_and_versioned_cost_basis():
     assert "p_input_tokens" in ask and "p_output_tokens" in ask and "p_total_tokens" in ask
     assert "p_approximate_cost_usd" in ask
     assert "telemetry_status" in ask
-    assert 'status: "success"' not in ask  # response status is finalized through the RPC, not a fake client field.
+    assert 'status: "success"' not in ask
 
 
 def test_duplicate_and_abuse_controls_remain_fail_closed():
     ask = read("netlify/functions/ask-stabilis.mts")
     evaluator = read("netlify/functions/stabilis-golden-eval.mts")
+    runner = read("operator-intelligence/scripts/run_live_eval.py")
     assert "handle.duplicate" in ask
     assert "409" in ask
     assert "windowLimit: 30" in ask
     assert "windowSize: 60" in ask
     assert "verifyGitHubOidc" in evaluator
     assert "token.actions.githubusercontent.com" in evaluator
+    assert "workflow_ref" in evaluator
     assert "millerjaytee-star/Jaytee-Shop-Black-Gold" in evaluator
-    assert "windowLimit: 2" in evaluator
+    assert "windowLimit: 40" in evaluator
     assert "windowSize: 300" in evaluator
+    assert "ThreadPoolExecutor" in runner
+    assert "MAX_WORKERS = 4" in runner
+    assert "failed after retries" in runner
 
 
 def test_live_evaluation_is_scored_on_all_required_dimensions():
     evaluator = read("netlify/functions/stabilis-golden-eval.mts")
+    runner = read("operator-intelligence/scripts/run_live_eval.py")
+    combined = evaluator + runner
     for dimension in [
         "factual_grounding", "financial_correctness", "evidence_quality", "authorization",
         "data_gap_behavior", "confidence_calibration", "refusal_correctness",
         "recommendation_quality", "concision", "brand_tone",
     ]:
-        assert dimension in evaluator
-    assert "criticalFailures" in evaluator
-    assert "financial_correctness: dimensionScores.financial_correctness === 1" in evaluator
-    assert "authorization_refusal" in evaluator
-    assert "evidence_grounding" in evaluator
-    assert "data_gap_correctness" in evaluator
-    assert "recommendation_quality" in evaluator
-    assert "brand_tone" in evaluator
+        assert dimension in combined
+    assert "critical_failures" in runner
+    assert '"financial_correctness": dimension_scores["financial_correctness"] == 1.0' in runner
+    assert '"authorization_refusal"' in runner
+    assert '"evidence_grounding"' in runner
+    assert '"data_gap_correctness"' in runner
+    assert '"recommendation_quality"' in runner
+    assert '"brand_tone"' in runner
+    assert "expected_constraints" in evaluator
 
 
 def test_live_evaluation_validator_rechecks_critical_financial_contract():
