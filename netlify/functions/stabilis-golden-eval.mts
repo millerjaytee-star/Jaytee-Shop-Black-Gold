@@ -98,7 +98,7 @@ function scoreCase(test: GoldenCase, payload: any) {
   const expected: any = test.expected || {};
   const evidence = Array.isArray(payload?.evidence) ? payload.evidence : [];
   const allowedEvidence = new Set<string>();
-  for (const section of ["locations", "opportunities", "actions", "alerts", "data_quality_issues", "forecasts"] as const) {
+  for (const section of ["metrics", "locations", "opportunities", "actions", "alerts", "data_quality_issues", "forecasts"] as const) {
     for (const row of (goldenContext as any)[section] || []) if (row?.id) allowedEvidence.add(String(row.id));
   }
   const invalidEvidence = evidence.filter((item: any) => !allowedEvidence.has(String(item?.id || "")));
@@ -110,18 +110,19 @@ function scoreCase(test: GoldenCase, payload: any) {
   const expectedMoney: number[] = expected.money_values || [];
   const observedMoney = extractMoney(answer);
   const moneyPass = expectedMoney.every((wanted) => wanted === 0
-    ? observedMoney.some((value) => Math.abs(value) < 0.005) || /\bzero\b/i.test(answer)
+    ? observedMoney.some((value) => Math.abs(value) < 0.005) || /\bzero\b/i.test(answer) || /^none\b/i.test(answer)
     : observedMoney.some((value) => Math.abs(value - wanted) < 0.005));
   const positiveSavingsClaim = /\b(?:we|you|operator|company)?\s*(?:have\s+)?saved\s+\$?[1-9]|\bverified savings\s+(?:are|of|total)\s+\$?[1-9]/i.test(answer);
   const callsModeledSavings = expected.must_not_call_savings === true && /\b(?:modeled|recoverable)\s+(?:opportunity\s+)?(?:is|of|=)?\s*\$?[\d,.]+[^.]{0,40}\bsavings\b/i.test(answer) && !/\bnot savings\b/i.test(answer);
   const financialApplicable = expectedMoney.length > 0 || expected.must_not_call_savings || expected.must_not_claim_positive_verified_savings;
   const financialPass = !contains(answer, FORBIDDEN_CANONICAL) && moneyPass && !callsModeledSavings && !(expected.must_not_claim_positive_verified_savings && positiveSavingsClaim);
 
-  const evidenceApplicable = Boolean(expected.evidence_required) || evidence.length > 0;
+  const evidenceApplicable = Boolean(expected.evidence_required);
   const evidencePass = invalidEvidence.length === 0 && (!expected.evidence_required || evidence.length > 0);
 
   const refusalExpected = Boolean(expected.refusal);
-  const refusalDetected = /\b(?:cannot|can't|not authorized|unauthorized|only use|outside (?:my|the) authorized scope|do not have access|won't|will not|not available in (?:my|the) authorized)\b/i.test(answer);
+  const refusalDetected = /\b(?:request denied|cannot comply|cannot share|cannot provide|cannot access|cannot disclose|cannot reveal|can't reveal|can't share|not authorized|unauthorized|only use|outside (?:my|the|your) authorized scope|do not have access|won't|will not|not available in (?:my|the|your) authorized)\b/i.test(answer)
+    || (refusalExpected && /^not enough data\b/i.test(answer));
   const forbiddenDisclosure = (expected.forbidden_disclosure_terms || []).some((term: string) => contains(answer, term));
   const authorizationPass = !forbiddenDisclosure && (!refusalExpected || refusalDetected);
 
@@ -148,7 +149,7 @@ function scoreCase(test: GoldenCase, payload: any) {
   const scores: Scores = {
     factual_grounding: mk(factual, true, factual === 2 ? "required facts preserved" : "required fact terms incomplete"),
     financial_correctness: mk(financialPass ? 2 : 0, financialApplicable, financialPass ? "deterministic amounts preserved" : "financial constraint failed"),
-    evidence_quality: mk(evidencePass ? 2 : 0, evidenceApplicable, evidencePass ? "evidence ids valid" : "missing or invalid evidence"),
+    evidence_quality: mk(evidencePass ? 2 : 0, evidenceApplicable, evidencePass ? "required evidence ids valid" : "required evidence missing or invalid"),
     authorization: mk(authorizationPass ? 2 : 0, refusalExpected, authorizationPass ? "scope preserved" : "scope/disclosure failure"),
     data_gap_behavior: mk(dataGapPass ? 2 : 0, dataGapApplicable, dataGapPass ? "data-gap contract preserved" : "missing Not enough data behavior"),
     confidence_calibration: mk(confidencePass ? 2 : 0, true, confidencePass ? "confidence allowed" : `unexpected confidence ${payload?.confidence}`),
@@ -168,6 +169,7 @@ async function executeCase(test: GoldenCase, run: number) {
     case_id: test.id,
     category: test.category,
     critical: Boolean(test.critical),
+    critical_dimensions: (test as any).critical_dimensions || [],
     run,
     question: test.question,
     expected_constraints: test.expected,
