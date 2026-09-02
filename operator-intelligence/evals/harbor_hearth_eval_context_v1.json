@@ -6,6 +6,7 @@
   "context": {
     "organization": "Harbor & Hearth Restaurant Group",
     "authorized_scope": "This fictional organization only. No other organization or tenant data is authorized.",
+    "authorized_locations": ["HHR-07","HHR-08","HHR-09","HHR-10"],
     "focused_conclusion": "HHR-07 labor productivity is a HIGH-confidence primary opportunity supported by overtime evidence that is not additive."
   },
   "kpis": {
