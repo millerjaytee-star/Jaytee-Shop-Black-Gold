@@ -146,13 +146,7 @@ jobs:
             BASE="https://stabilis-ops-group.netlify.app"
           fi
           mkdir -p outputs
-          token_response=$(curl -fsS \
-            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=stabilis-golden-eval")
-          oidc_token=$(printf '%s' "$token_response" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')
-          echo "::add-mask::${oidc_token}"
           STABILIS_RELEASE_BASE_URL="$BASE" \
-          STABILIS_GOLDEN_OIDC_TOKEN="$oidc_token" \
           STABILIS_GOLDEN_OUTPUT="outputs/ask-stabilis-live-eval.json" \
             python scripts/run_live_eval.py
           python scripts/validate_live_eval.py outputs/ask-stabilis-live-eval.json
