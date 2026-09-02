@@ -97,6 +97,8 @@ export async function runAskStabilisModel(question: string, context: Json, timeo
     const client = new OpenAI();
     const completion = await client.chat.completions.create({
       model: MODEL_ALIAS,
+      reasoning_effort: "minimal",
+      max_completion_tokens: 1400,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: ASK_STABILIS_SYSTEM_PROMPT },
