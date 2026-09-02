@@ -57,7 +57,11 @@ def main() -> None:
     payload = json.loads(body)
     assert payload.get("ok") is True, payload
     assert payload.get("provider") == "netlify-ai-gateway/openai", payload
-    assert payload.get("model") == "gpt-5", payload
+    # The gateway may return the provider's pinned model snapshot ID (for
+    # example gpt-5-2025-08-07) even when Stabilis requests the gpt-5 alias.
+    # Verify the intended model family without rejecting a legitimate pin.
+    model = str(payload.get("model") or "")
+    assert model == "gpt-5" or model.startswith("gpt-5-"), payload
     print("ASK STABILIS AI GATEWAY PROVIDER SMOKE = PASS")
 
 
