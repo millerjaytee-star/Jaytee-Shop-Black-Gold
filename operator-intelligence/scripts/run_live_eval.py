@@ -1,7 +1,7 @@
 """Run the release live-model golden suite as short OIDC-authenticated requests.
 
-The Netlify function executes one model case at a time. This runner owns concurrency,
-aggregation, retries for transient HTTP failures, and the persisted release artifact.
+Each request mints a fresh GitHub OIDC token. The evaluator keeps strict repository,
+workflow, audience, signature, and expiry validation without reusing an expired token.
 """
 from __future__ import annotations
 
@@ -16,21 +16,37 @@ import httpx
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = json.loads((ROOT / "evals/ask_stabilis_golden_v1.json").read_text(encoding="utf-8"))
 BASE = os.environ["STABILIS_RELEASE_BASE_URL"].rstrip("/")
-TOKEN = os.environ["STABILIS_GOLDEN_OIDC_TOKEN"]
+OIDC_URL = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
+OIDC_REQUEST_TOKEN = os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]
 OUT = Path(os.environ.get("STABILIS_GOLDEN_OUTPUT", "outputs/ask-stabilis-live-eval.json"))
 TRANSIENT = {429, 502, 503, 504}
-MAX_WORKERS = 4
+MAX_WORKERS = 6
+
+
+def fresh_oidc_token() -> str:
+    separator = "&" if "?" in OIDC_URL else "?"
+    with httpx.Client(timeout=15.0) as client:
+        response = client.get(
+            f"{OIDC_URL}{separator}audience=stabilis-golden-eval",
+            headers={"Authorization": f"bearer {OIDC_REQUEST_TOKEN}"},
+        )
+    response.raise_for_status()
+    token = str(response.json().get("value") or "")
+    if not token:
+        raise RuntimeError("GitHub OIDC token response did not contain a value")
+    return token
 
 
 def request_case(case: dict, run: int) -> dict:
     payload = {"case_id": case["id"], "run": run}
     last_error = ""
-    for attempt in range(3):
+    for attempt in range(2):
         try:
-            with httpx.Client(timeout=40.0) as client:
+            oidc_token = fresh_oidc_token()
+            with httpx.Client(timeout=45.0) as client:
                 response = client.post(
                     f"{BASE}/api/stabilis-golden-eval",
-                    headers={"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"},
+                    headers={"Authorization": f"Bearer {oidc_token}", "Content-Type": "application/json"},
                     json=payload,
                 )
             if response.status_code == 200:
@@ -38,10 +54,10 @@ def request_case(case: dict, run: int) -> dict:
             last_error = f"HTTP {response.status_code}: {response.text[:800]}"
             if response.status_code not in TRANSIENT:
                 break
-        except (httpx.TimeoutException, httpx.NetworkError) as exc:
+        except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError) as exc:
             last_error = f"{type(exc).__name__}: {exc}"
-        if attempt < 2:
-            time.sleep(2**attempt)
+        if attempt < 1:
+            time.sleep(2)
     raise RuntimeError(f"{case['id']} run {run} failed after retries: {last_error}")
 
 
@@ -104,7 +120,8 @@ def main() -> None:
         for future in as_completed(future_map):
             results.append(future.result())
 
-    results.sort(key=lambda row: (next(i for i, c in enumerate(SPEC["cases"]) if c["id"] == row["case_id"]), row["run"]))
+    case_order = {case["id"]: i for i, case in enumerate(SPEC["cases"])}
+    results.sort(key=lambda row: (case_order[row["case_id"]], row["run"]))
     summary = summarize(results)
     status = "PASS" if all(summary["gates"].values()) else "FAIL"
     total_tokens = sum(int(row.get("usage", {}).get("totalTokens") or 0) for row in results)
