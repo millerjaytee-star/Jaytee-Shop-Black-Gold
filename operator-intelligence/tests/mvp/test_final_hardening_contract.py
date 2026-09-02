@@ -94,7 +94,10 @@ def test_duplicate_and_abuse_controls_remain_fail_closed():
     assert "windowLimit: 40" in evaluator
     assert "windowSize: 300" in evaluator
     assert "ThreadPoolExecutor" in runner
-    assert "MAX_WORKERS = 4" in runner
+    assert "MAX_WORKERS = 6" in runner
+    assert "fresh_oidc_token" in runner
+    assert "ACTIONS_ID_TOKEN_REQUEST_URL" in runner
+    assert "ACTIONS_ID_TOKEN_REQUEST_TOKEN" in runner
     assert "failed after retries" in runner
 
 
