@@ -65,6 +65,15 @@ def test_ask_stabilis_has_reasonable_abuse_guardrail():
     assert 'windowSize: 60' in fn
 
 
+def test_preview_qa_ignores_only_navigation_aborts_not_real_asset_failures():
+    qa = read("operator-intelligence/scripts/release_preview_qa.py")
+    assert "ignorable_navigation_abort" in qa
+    assert "net::ERR_ABORTED" in qa
+    assert 'page.on("requestfailed", capture_request_failure)' in qa
+    assert "resp.status >= 400" in qa
+    assert 'resp.request.resource_type in {"script", "stylesheet", "image", "font"}' in qa
+
+
 def test_ask_stabilis_client_has_loading_retry_feedback_and_scope():
     app = read("app.html")
     client = read("assets/ask-stabilis.js")
