@@ -1,0 +1,61 @@
+{
+  "fixture": "Harbor & Hearth Restaurant Group",
+  "fixture_version": "harbor-hearth-golden-context-v1",
+  "fictional": true,
+  "as_of": "August 2026 controlled fixture",
+  "context": {
+    "organization": "Harbor & Hearth Restaurant Group",
+    "authorized_scope": "This fictional organization only. No other organization or tenant data is authorized.",
+    "authorized_locations": ["HHR-07","HHR-08","HHR-09","HHR-10"],
+    "focused_conclusion": "HHR-07 labor productivity is a HIGH-confidence primary opportunity supported by overtime evidence that is not additive."
+  },
+  "kpis": {
+    "operator_health": 71,
+    "modeled_opportunity": 392570.56,
+    "verified_value": 0,
+    "data_quality": 70,
+    "forecast_confidence": 81
+  },
+  "metrics": [
+    {"id":"KPI-MODELED-OPPORTUNITY","metric_name":"Modeled Recoverable Opportunity","value":392570.56,"confidence":"HIGH","financial_stage":"MODELED OPPORTUNITY","verified":false},
+    {"id":"KPI-VERIFIED-VALUE","metric_name":"Verified Financial Impact","value":0,"confidence":"HIGH","financial_stage":"VERIFIED FINANCIAL IMPACT","verified":true}
+  ],
+  "locations": [
+    {"id":"LOC-HHR-07","code":"HHR-07","name":"Foundry Row","health":56,"sales":3172000,"labor_pct":36.5,"food_cost_pct":29.7,"data_quality":89,"risk":"HIGH"},
+    {"id":"LOC-HHR-08","code":"HHR-08","name":"Station Market","health":59,"sales":3048000,"labor_pct":35.9,"food_cost_pct":30.0,"data_quality":63,"risk":"HIGH"},
+    {"id":"LOC-HHR-09","code":"HHR-09","name":"Old Port","health":51,"sales":2969000,"labor_pct":32.1,"food_cost_pct":35.1,"data_quality":86,"risk":"HIGH"},
+    {"id":"LOC-HHR-10","code":"HHR-10","name":"Harbor South","health":48,"sales":2787000,"sales_trend_pct":-8.2,"labor_pct":32.4,"food_cost_pct":30.2,"data_quality":90,"risk":"HIGH"}
+  ],
+  "opportunities": [
+    {"id":"HHR09-FOOD-01","location_code":"HHR-09","category":"Food Cost","title":"Food and inventory control variance","recoverable_amount":130427.46,"confidence":"HIGH","kind":"PRIMARY","counted_in_rollup":true,"owner":"Regional Ops","priority":96},
+    {"id":"HHR07-LABOR-01","location_code":"HHR-07","category":"Labor","title":"Labor productivity above comparable target","recoverable_amount":102844.37,"confidence":"HIGH","kind":"PRIMARY","counted_in_rollup":true,"owner":"Area Leader","priority":94},
+    {"id":"HHR08-LABOR-01","location_code":"HHR-08","category":"Labor","title":"Labor deployment inefficiency","recoverable_amount":86295.32,"confidence":"HIGH","kind":"PRIMARY","counted_in_rollup":true,"owner":"GM + Area","priority":89},
+    {"id":"HHR10-REV-01","location_code":"HHR-10","category":"Revenue","title":"Persistent revenue decline","recoverable_amount":73003.41,"confidence":"MEDIUM","kind":"PRIMARY","counted_in_rollup":true,"owner":"Commercial Ops","priority":84},
+    {"id":"HHR07-OT-01","location_code":"HHR-07","category":"Overtime","title":"Overtime above expected range","recoverable_amount":0,"additive_amount":0,"confidence":"HIGH","kind":"SUPPORTING","counted_in_rollup":false,"related_to":"HHR07-LABOR-01","status":"NOT COUNTED TWICE","owner":"Area Leader"}
+  ],
+  "actions": [
+    {"id":"ACT-091","location_code":"HHR-09","title":"Inventory count and waste-control reset","owner":"Regional Ops","priority":"HIGH","status":"PLANNED","expected_opportunity":130427.46},
+    {"id":"ACT-071","location_code":"HHR-07","title":"Rebuild peak and closing labor deployment","owner":"Area Leader","priority":"HIGH","status":"IN PROGRESS","expected_opportunity":102844.37},
+    {"id":"ACT-081","location_code":"HHR-08","title":"Schedule-to-demand variance review","owner":"GM + Area","priority":"HIGH","status":"APPROVED","expected_opportunity":86295.32}
+  ],
+  "alerts": [
+    {"id":"ALERT-HHR07-OT","level":"HIGH","category":"Labor","location_code":"HHR-07","text":"Overtime exceeded expected range; it supports the labor opportunity and is not additive value."},
+    {"id":"ALERT-HHR09-INV","level":"HIGH","category":"Inventory","location_code":"HHR-09","text":"Food/inventory variance remains the largest modeled financial opportunity."},
+    {"id":"ALERT-HHR10-REV","level":"MODERATE","category":"Revenue","location_code":"HHR-10","text":"Revenue decline has persisted for three periods and requires traffic/check decomposition."}
+  ],
+  "data_quality_issues": [
+    {"id":"DQ-HHR08-STALE","location_code":"HHR-08","severity":"MODERATE","issue":"Inventory count freshness is outside the preferred window.","status":"OPEN"},
+    {"id":"DQ-HHR06-MISSING","location_code":"HHR-06","severity":"MODERATE","issue":"One inventory reporting week is missing.","status":"OPEN"},
+    {"id":"DQ-HHR03-CONFLICT","location_code":"HHR-03","severity":"MODERATE","issue":"Inventory source conflict requires reconciliation.","status":"OPEN"}
+  ],
+  "forecasts": [
+    {"id":"FC-SALES-7D","metric":"Sales","horizon":"Next 7 days","plan":181400,"forecast":184900,"confidence":86,"accuracy":91},
+    {"id":"FC-LABOR-7D","metric":"Labor Hours","horizon":"Next 7 days","plan":3810,"forecast":3745,"confidence":80,"accuracy":86}
+  ],
+  "financial_stage_definitions": {
+    "modeled_opportunity": "Potential recoverable opportunity calculated deterministically by Stabilis; not savings.",
+    "action_underway": "An approved operating intervention is being executed.",
+    "observed_improvement": "Measured movement after intervention; attribution not yet verified.",
+    "verified_financial_impact": "Reviewer-approved financial attribution supported by evidence. Current value is $0."
+  }
+}

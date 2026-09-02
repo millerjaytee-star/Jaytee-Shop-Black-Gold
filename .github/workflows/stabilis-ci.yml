@@ -41,6 +41,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   quality:
@@ -102,8 +103,15 @@ jobs:
           test -s assets/stabilis.css
           test -s assets/app-modules.js
           test -s assets/ask-stabilis.js
+          test -s netlify/functions/_stabilis-ai-core.mts
           test -s netlify/functions/ask-stabilis.mts
           test -s netlify/functions/stabilis-ai-health.mts
+          test -s netlify/functions/stabilis-golden-eval.mts
+          test -s operator-intelligence/evals/ask_stabilis_golden_v1.json
+          test -s operator-intelligence/evals/harbor_hearth_eval_context_v1.json
+          test -s operator-intelligence/scripts/run_live_eval.py
+          test -s operator-intelligence/scripts/validate_live_eval.py
+          test -s operator-intelligence/supabase/migrations/20260902003000_ask_stabilis_telemetry_hardening.sql
           test -s stabilis-release-marker.txt
       - name: Lint
         run: ruff check src scripts tests
@@ -127,3 +135,26 @@ jobs:
         run: |
           python scripts/release_preview_qa.py
           python scripts/ask_stabilis_preview_qa.py
+      - name: Live Ask Stabilis golden evaluation
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            BASE="https://deploy-preview-${PR_NUMBER}--stabilis-ops-group.netlify.app"
+          else
+            BASE="https://stabilis-ops-group.netlify.app"
+          fi
+          mkdir -p outputs
+          STABILIS_RELEASE_BASE_URL="$BASE" \
+          STABILIS_GOLDEN_OUTPUT="outputs/ask-stabilis-live-eval.json" \
+            python scripts/run_live_eval.py
+          python scripts/validate_live_eval.py outputs/ask-stabilis-live-eval.json
+      - name: Persist live evaluation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ask-stabilis-live-eval-${{ github.event_name }}-${{ github.run_id }}
+          path: operator-intelligence/outputs/ask-stabilis-live-eval.json
+          if-no-files-found: warn
+          retention-days: 90
