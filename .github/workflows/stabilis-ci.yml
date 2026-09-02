@@ -41,6 +41,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   quality:
@@ -102,8 +103,13 @@ jobs:
           test -s assets/stabilis.css
           test -s assets/app-modules.js
           test -s assets/ask-stabilis.js
+          test -s netlify/functions/_stabilis-ai-core.mts
           test -s netlify/functions/ask-stabilis.mts
           test -s netlify/functions/stabilis-ai-health.mts
+          test -s netlify/functions/stabilis-golden-eval.mts
+          test -s operator-intelligence/evals/ask_stabilis_golden_v1.json
+          test -s operator-intelligence/evals/harbor_hearth_eval_context_v1.json
+          test -s operator-intelligence/supabase/migrations/20260902003000_ask_stabilis_telemetry_hardening.sql
           test -s stabilis-release-marker.txt
       - name: Lint
         run: ruff check src scripts tests
@@ -127,3 +133,40 @@ jobs:
         run: |
           python scripts/release_preview_qa.py
           python scripts/ask_stabilis_preview_qa.py
+      - name: Live Ask Stabilis golden evaluation
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            BASE="https://deploy-preview-${PR_NUMBER}--stabilis-ops-group.netlify.app"
+          else
+            BASE="https://stabilis-ops-group.netlify.app"
+          fi
+          mkdir -p outputs
+          token_response=$(curl -fsS \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=stabilis-golden-eval")
+          oidc_token=$(printf '%s' "$token_response" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')
+          echo "::add-mask::${oidc_token}"
+          http_code=$(curl -sS --retry 1 --retry-delay 4 \
+            -o outputs/ask-stabilis-live-eval.json \
+            -w '%{http_code}' \
+            -X POST "${BASE}/api/stabilis-golden-eval" \
+            -H "Authorization: Bearer ${oidc_token}" \
+            -H "Content-Type: application/json" \
+            --data '{"mode":"release"}')
+          if [ "$http_code" != "200" ]; then
+            echo "Live golden evaluation returned HTTP ${http_code}"
+            cat outputs/ask-stabilis-live-eval.json
+            exit 1
+          fi
+          python scripts/validate_live_eval.py outputs/ask-stabilis-live-eval.json
+      - name: Persist live evaluation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ask-stabilis-live-eval-${{ github.event_name }}-${{ github.run_id }}
+          path: operator-intelligence/outputs/ask-stabilis-live-eval.json
+          if-no-files-found: warn
+          retention-days: 90
