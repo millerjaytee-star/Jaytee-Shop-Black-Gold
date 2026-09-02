@@ -14,6 +14,10 @@ from src.opportunities.engine import build
 from src.scoring.priority import prioritize
 from src.scoring.operator import operator_scores
 from src.reporting.report import generate
+
+(ROOT/'outputs').mkdir(parents=True,exist_ok=True)
+(ROOT/'data'/'normalized').mkdir(parents=True,exist_ok=True)
+
 raw=load_raw(ROOT); val=validate(raw); norm=normalize_monthly(raw['monthly'],val); metrics=calculate_all(norm)
 window=latest_window(metrics,12); agg=aggregate_by_location(window); targets=load_targets(ROOT)
 findings=detect(agg,window,targets,val); root_causes=decompose(findings,agg); opps,counted=build(findings,agg,ROOT); priorities=prioritize(counted); scores=operator_scores(agg,counted,val['data_quality_score'])

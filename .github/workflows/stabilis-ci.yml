@@ -12,6 +12,7 @@ on:
       - 'privacy.html'
       - 'terms.html'
       - 'assets/**'
+      - 'netlify/**'
       - 'operator-intelligence/**'
       - '_redirects'
       - 'netlify.toml'
@@ -30,6 +31,7 @@ on:
       - 'privacy.html'
       - 'terms.html'
       - 'assets/**'
+      - 'netlify/**'
       - 'operator-intelligence/**'
       - '_redirects'
       - 'netlify.toml'
@@ -57,6 +59,22 @@ jobs:
         run: python -m pip install --upgrade pip && pip install -e ".[test,dev]"
       - name: Generate deterministic Harbor & Hearth fixtures
         run: python scripts/generate_dataset.py
+      - name: Full ingestion-to-report pipeline smoke
+        run: |
+          mkdir -p outputs
+          python scripts/run_analysis.py > outputs/ci-pipeline-smoke.json
+          test -s outputs/validation.json
+          test -s outputs/findings.json
+          test -s outputs/opportunities_counted.json
+          test -s outputs/priorities.json
+          test -s outputs/scores.json
+          test -s outputs/operator_intelligence_report.md
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload=json.loads(Path('outputs/ci-pipeline-smoke.json').read_text())
+          assert round(float(payload['recoverable_total']),2)==392570.56, payload['recoverable_total']
+          PY
       - name: Unit, integration, financial and release contract tests
         run: pytest -q
       - name: Compile check
@@ -68,6 +86,8 @@ jobs:
           node --check assets/demo-data.js
           node --check assets/demo.js
           node --check assets/app.js
+          node --check assets/app-modules.js
+          node --check assets/ask-stabilis.js
       - name: Static production build contract
         working-directory: .
         run: |
@@ -80,6 +100,10 @@ jobs:
           test -s privacy.html
           test -s terms.html
           test -s assets/stabilis.css
+          test -s assets/app-modules.js
+          test -s assets/ask-stabilis.js
+          test -s netlify/functions/ask-stabilis.mts
+          test -s netlify/functions/stabilis-ai-health.mts
           test -s stabilis-release-marker.txt
       - name: Lint
         run: ruff check src scripts tests
@@ -92,10 +116,14 @@ jobs:
         env:
           STABILIS_RELEASE_BASE_URL: https://deploy-preview-${{ github.event.pull_request.number }}--stabilis-ops-group.netlify.app
           STABILIS_EXPECT_RELEASE_MARKER: stabilis-operator-intelligence-10x-20260901
-        run: python scripts/release_preview_qa.py
+        run: |
+          python scripts/release_preview_qa.py
+          python scripts/ask_stabilis_preview_qa.py
       - name: Netlify production browser QA
         if: github.event_name == 'push'
         env:
           STABILIS_RELEASE_BASE_URL: https://stabilis-ops-group.netlify.app
           STABILIS_EXPECT_RELEASE_MARKER: stabilis-operator-intelligence-10x-20260901
-        run: python scripts/release_preview_qa.py
+        run: |
+          python scripts/release_preview_qa.py
+          python scripts/ask_stabilis_preview_qa.py

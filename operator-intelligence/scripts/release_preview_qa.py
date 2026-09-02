@@ -11,7 +11,7 @@ import time
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from playwright.sync_api import Browser, Page, sync_playwright
+from playwright.sync_api import Browser, Page, Request as PlaywrightRequest, sync_playwright
 
 BASE = os.environ.get("STABILIS_RELEASE_BASE_URL", "").rstrip("/")
 if not BASE:
@@ -103,6 +103,15 @@ def ignorable_preview_console_error(text: str) -> bool:
     return "Framing 'https://app.netlify.com/' violates" in text
 
 
+def ignorable_navigation_abort(req: PlaywrightRequest) -> bool:
+    """A route change may cancel an in-flight asset after the current page is already valid.
+
+    Chromium reports that deliberate client cancellation as net::ERR_ABORTED. It is not an
+    HTTP/network failure; HTTP >=400 responses and every other request failure remain fatal.
+    """
+    return req.url.startswith(BASE) and "net::ERR_ABORTED" in str(req.failure or "")
+
+
 def attach_error_capture(page: Page, errors: list[str]) -> None:
     page.on("pageerror", lambda exc: errors.append(f"pageerror: {exc}"))
 
@@ -110,11 +119,12 @@ def attach_error_capture(page: Page, errors: list[str]) -> None:
         if msg.type == "error" and not ignorable_preview_console_error(msg.text):
             errors.append(f"console:{msg.type}: {msg.text}")
 
+    def capture_request_failure(req: PlaywrightRequest) -> None:
+        if not ignorable_navigation_abort(req):
+            errors.append(f"requestfailed: {req.method} {req.url} {req.failure}")
+
     page.on("console", capture_console)
-    page.on(
-        "requestfailed",
-        lambda req: errors.append(f"requestfailed: {req.method} {req.url} {req.failure}"),
-    )
+    page.on("requestfailed", capture_request_failure)
     page.on(
         "response",
         lambda resp: errors.append(f"asset-http-{resp.status}: {resp.url}")
