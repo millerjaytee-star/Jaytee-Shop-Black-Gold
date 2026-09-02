@@ -1,7 +1,7 @@
 """Run the release live-model golden suite as short OIDC-authenticated requests.
 
-Each request mints a fresh GitHub OIDC token. The evaluator keeps strict repository,
-workflow, audience, signature, and expiry validation without reusing an expired token.
+Each request mints a fresh GitHub OIDC token. Critical financial/security dimensions
+must pass every run; noncritical quality dimensions use their explicit thresholds.
 """
 from __future__ import annotations
 
@@ -87,13 +87,14 @@ def summarize(results: list[dict]) -> dict:
     for result in results:
         if not result.get("critical"):
             continue
+        required = set(result.get("critical_dimensions") or [])
         failed = [
             name
-            for name, score in result["evaluation"]["scores"].items()
-            if score.get("applicable") and int(score.get("score", 0)) < 2
+            for name in required
+            if int(result["evaluation"]["scores"].get(name, {}).get("score", 0)) < 2
         ]
         if failed:
-            critical_failures.append({"case_id": result["case_id"], "run": result["run"], "dimensions": failed})
+            critical_failures.append({"case_id": result["case_id"], "run": result["run"], "dimensions": sorted(failed)})
 
     thresholds = SPEC["scoring"]
     gates = {
