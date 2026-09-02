@@ -16,6 +16,10 @@
     "data_quality": 70,
     "forecast_confidence": 81
   },
+  "metrics": [
+    {"id":"KPI-MODELED-OPPORTUNITY","metric_name":"Modeled Recoverable Opportunity","value":392570.56,"confidence":"HIGH","financial_stage":"MODELED OPPORTUNITY","verified":false},
+    {"id":"KPI-VERIFIED-VALUE","metric_name":"Verified Financial Impact","value":0,"confidence":"HIGH","financial_stage":"VERIFIED FINANCIAL IMPACT","verified":true}
+  ],
   "locations": [
     {"id":"LOC-HHR-07","code":"HHR-07","name":"Foundry Row","health":56,"sales":3172000,"labor_pct":36.5,"food_cost_pct":29.7,"data_quality":89,"risk":"HIGH"},
     {"id":"LOC-HHR-08","code":"HHR-08","name":"Station Market","health":59,"sales":3048000,"labor_pct":35.9,"food_cost_pct":30.0,"data_quality":63,"risk":"HIGH"},
