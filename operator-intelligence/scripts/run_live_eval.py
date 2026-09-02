@@ -20,7 +20,8 @@ OIDC_URL = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
 OIDC_REQUEST_TOKEN = os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]
 OUT = Path(os.environ.get("STABILIS_GOLDEN_OUTPUT", "outputs/ask-stabilis-live-eval.json"))
 TRANSIENT = {429, 502, 503, 504}
-MAX_WORKERS = 6
+MAX_WORKERS = 3
+MAX_ATTEMPTS = 3
 
 
 def fresh_oidc_token() -> str:
@@ -40,7 +41,7 @@ def fresh_oidc_token() -> str:
 def request_case(case: dict, run: int) -> dict:
     payload = {"case_id": case["id"], "run": run}
     last_error = ""
-    for attempt in range(2):
+    for attempt in range(MAX_ATTEMPTS):
         try:
             oidc_token = fresh_oidc_token()
             with httpx.Client(timeout=45.0) as client:
@@ -56,8 +57,8 @@ def request_case(case: dict, run: int) -> dict:
                 break
         except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError) as exc:
             last_error = f"{type(exc).__name__}: {exc}"
-        if attempt < 1:
-            time.sleep(2)
+        if attempt < MAX_ATTEMPTS - 1:
+            time.sleep(3 * (attempt + 1))
     raise RuntimeError(f"{case['id']} run {run} failed after retries: {last_error}")
 
 
