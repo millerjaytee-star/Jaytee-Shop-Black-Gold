@@ -30,7 +30,7 @@ Dedicated project: `Stabilis Operator Intelligence` / `vpunfmwklwjefvchvmpn` / `
 
 Live negative-security tests passed for cross-tenant reads, cross-tenant writes, anonymous schema access, private storage isolation and released-report isolation. Current Supabase security advisor reports zero security lints after hardening.
 
-**REAL FINANCIAL DATA RELEASE GATE = BLOCKED** pending positive-path login/session/password-reset/invitation testing in the deployed application. Do not upload real restaurant financial data until that gate is explicitly changed to PASSED.
+The authoritative real-financial-data release decision is maintained in [`docs/security-release-gate.md`](docs/security-release-gate.md). Its current status is **CONTROLLED PILOT FINANCIAL DATA RELEASE GATE = PASSED** for the dedicated Stabilis environment and controlled-pilot scope described there. This does not approve unrelated environments or remove the remaining calibration and customer-value validation work.
 
 ## Quality gate
 
