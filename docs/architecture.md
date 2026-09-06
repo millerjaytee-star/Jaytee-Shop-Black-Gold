@@ -16,4 +16,4 @@ Upload → Detect → Map → Validate → Normalize → Store → Calculate →
 Every private operating record is scoped to an organization and, when relevant, a location. Supabase RLS uses authenticated membership/location assignments. Service-role credentials remain server-side only.
 
 ## Environment separation
-Local → development → deploy preview/staging → production. Fictional demo data is safe for public use. Real financial uploads remain disabled until the dedicated live Stabilis Supabase security gate passes.
+Local → development → deploy preview/staging → production. Fictional demo data is safe for public use. The authoritative real-financial-data decision is [`security-release-gate.md`](security-release-gate.md); its controlled-pilot approval applies only to the dedicated Stabilis environment and scope documented there.

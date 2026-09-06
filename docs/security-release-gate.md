@@ -2,6 +2,8 @@
 
 Status updated 2026-09-01.
 
+This file is the authoritative repository statement for whether real financial data may be used. Its approval is limited to the dedicated Stabilis environment and controlled-pilot scope described below; all other environments remain unapproved unless this file explicitly says otherwise.
+
 ## Passed live infrastructure controls
 
 - Dedicated Supabase project: `Stabilis Operator Intelligence` (`vpunfmwklwjefvchvmpn`, `us-east-2`).

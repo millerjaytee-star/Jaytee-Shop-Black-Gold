@@ -6,6 +6,10 @@ This ledger maps the dedicated Stabilis Supabase production history to the repos
 
 Project ref: `vpunfmwklwjefvchvmpn`
 
+## Repository reproducibility limitation
+
+The release gate documents controls verified against the existing dedicated production project; it does not establish that this repository can bootstrap an equivalent project from scratch. The repository migration set currently depends on the untracked historical `202609010001_build_gate_c.sql` foundation, and two tracked files share the `202609010004` version prefix. Treat fresh-environment creation and disaster-recovery replay as blocked until a separate, explicitly reviewed migration-reproducibility task supplies the missing baseline and resolves the duplicate version. Do not rename, reorder, or synthesize production migrations as part of unrelated work.
+
 ## Persistent product migrations
 
 | Live Supabase migration | Repository source / disposition |

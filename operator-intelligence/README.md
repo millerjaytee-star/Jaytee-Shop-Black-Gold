@@ -2,9 +2,9 @@
 
 Verified operating-intelligence and execution system for multi-unit restaurant operators.
 
-Validation states: Synthetic Engine Validation PASSED; Infrastructure/Security Validation PENDING dedicated live Supabase execution; Real-World Engine Calibration PENDING pilots; Customer Value Validation PENDING pilots.
+Validation states: Synthetic Engine Validation PASSED; Infrastructure/Security Validation PASSED for the dedicated Stabilis environment and controlled-pilot scope documented in [`../docs/security-release-gate.md`](../docs/security-release-gate.md); Real-World Engine Calibration PENDING pilots; Customer Value Validation PENDING pilots.
 
-Local quick start: `python scripts/generate_dataset.py`, `python scripts/run_analysis.py`, `python -m src.services.build_gate_c`, `pytest -q`, `uvicorn src.api.app:app --host 127.0.0.1 --port 8000`.
+Local quick start: `python scripts/generate_dataset.py`, `python scripts/run_analysis.py`, `pytest -q`, `uvicorn src.api.app:app --host 127.0.0.1 --port 8000`.
 
 ## Integrated Stabilis web + demo application
 
@@ -13,7 +13,7 @@ The reference build combines the public Stabilis brand experience and the Operat
 Run locally:
 
 ```bash
-python -m src.services.build_gate_c
+python scripts/generate_dataset.py
 uvicorn src.api.app:app --reload --host 127.0.0.1 --port 8000
 ```
 
@@ -23,7 +23,7 @@ The Harbor & Hearth demo is fictional test data. The controlled engine reproduce
 
 ## Release gate
 
-Do **not** ingest real restaurant financial data until a dedicated Stabilis Supabase project is provisioned and live RLS/private-storage/cross-tenant security tests pass. Do not reuse Concrete Motivation or unrelated projects.
+The authoritative decision is [`../docs/security-release-gate.md`](../docs/security-release-gate.md). Its current approval is limited to controlled pilots in the dedicated Stabilis environment under the documented tenant, storage, authentication, deterministic-analysis and review controls. Do not reuse Concrete Motivation or unrelated projects, and do not treat this approval as real-world model calibration or customer-value validation.
 
 ## Architecture
 

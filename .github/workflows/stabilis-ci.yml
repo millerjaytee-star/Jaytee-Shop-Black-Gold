@@ -3,14 +3,8 @@ name: Stabilis Quality Gate
 on:
   pull_request:
     paths:
-      - 'index.html'
-      - 'app.html'
-      - 'login.html'
-      - 'operator-intelligence.html'
-      - 'operator-intelligence-report.html'
-      - 'security.html'
-      - 'privacy.html'
-      - 'terms.html'
+      - '*.html'
+      - 'package.json'
       - 'assets/**'
       - 'netlify/**'
       - 'operator-intelligence/**'
@@ -22,14 +16,8 @@ on:
   push:
     branches: [main]
     paths:
-      - 'index.html'
-      - 'app.html'
-      - 'login.html'
-      - 'operator-intelligence.html'
-      - 'operator-intelligence-report.html'
-      - 'security.html'
-      - 'privacy.html'
-      - 'terms.html'
+      - '*.html'
+      - 'package.json'
       - 'assets/**'
       - 'netlify/**'
       - 'operator-intelligence/**'
@@ -79,9 +67,10 @@ jobs:
         run: pytest -q
       - name: Compile check
         run: python -m compileall -q src scripts tests
-      - name: JavaScript syntax check
+      - name: JavaScript and package manifest syntax check
         working-directory: .
         run: |
+          node -e "JSON.parse(require('fs').readFileSync('package.json', 'utf8'))"
           node --check assets/public.js
           node --check assets/demo-data.js
           node --check assets/demo.js
@@ -99,6 +88,12 @@ jobs:
           test -s security.html
           test -s privacy.html
           test -s terms.html
+          test -s resources.html
+          test -s new-store-operational-readiness.html
+          test -s off-premise-line-accuracy.html
+          test -s labor-kds-workflow.html
+          test -s profit-control-reset.html
+          test -s thanks.html
           test -s assets/stabilis.css
           test -s assets/app-modules.js
           test -s assets/ask-stabilis.js
