@@ -1,0 +1,5 @@
+README.md
+docs/operator-intelligence-v1.md
+docs/verified-value-methodology.md
+docs/product-modules.md
+operator-intelligence/README.md
