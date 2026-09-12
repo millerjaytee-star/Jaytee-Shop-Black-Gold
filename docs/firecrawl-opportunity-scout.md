@@ -32,7 +32,9 @@ The score is a prospecting priority score, not a claim that the source is accura
 
 ## Endpoint
 
-`GET /api/stabilis-opportunity-scout?token=<secret>`
+`GET /api/stabilis-opportunity-scout` with `Authorization: Bearer <secret>`.
+
+Legacy query-token callers remain compatible; prefer the header to avoid secrets in URL histories and access logs.
 
 Required server-side Netlify secret:
 
@@ -62,3 +64,7 @@ The endpoint:
 - does not treat scraped/search text as verified financial truth.
 
 The existing external Firecrawl recurring monitor can continue serving as the scheduled discovery mechanism. This endpoint gives the Stabilis codebase an on-demand internal scout using the same signal model.
+
+## Bounded execution and evidence freshness
+
+Searches run in batches of two, retaining successful results if another query fails. There are still three queries per run: concurrency reduces wait time, not the per-run credit count. The response includes durationMs, partial, and an explicit persistence.status of not_enabled. No CRM write has been added. Recent-signal points require a parseable source date within the past 30 days; undated, future, or stale evidence earns no recency points. publishedAt remains null for unknown dates.
