@@ -19,6 +19,7 @@ type Lead = {
   score: number;
   status: "CONTACT_NOW" | "RESEARCH_FURTHER" | "WATCH" | "IGNORE";
   signals: string[];
+  publishedAt: string | null;
 };
 
 const FIRECRAWL_SEARCH_URL = "https://api.firecrawl.dev/v2/search";
@@ -39,7 +40,7 @@ function text(row: FirecrawlRow): string {
   return `${row.title || ""} ${row.description || row.snippet || ""}`.toLowerCase();
 }
 
-function scoreRow(row: FirecrawlRow): { score: number; signals: string[] } {
+function scoreRow(row: FirecrawlRow, now = Date.now()): { score: number; signals: string[] } {
   const haystack = text(row);
   let score = 0;
   const signals: string[] = [];
@@ -64,7 +65,9 @@ function scoreRow(row: FirecrawlRow): { score: number; signals: string[] } {
     score += 15;
     signals.push("operating_friction");
   }
-  if (/2026|today|this week|this month|new|latest|recent/.test(haystack)) {
+  // Recency requires a parseable source date, not marketing words or a year.
+  const published = Date.parse(row.date || "");
+  if (Number.isFinite(published) && published <= now && now - published <= 30 * 86_400_000) {
     score += 10;
     signals.push("recent_signal");
   }
@@ -119,34 +122,42 @@ export default async (req: Request) => {
 
   const url = new URL(req.url);
   const challenge = Netlify.env.get("STABILIS_OPPORTUNITY_SCOUT_TOKEN") || "";
-  if (!challenge || url.searchParams.get("token") !== challenge) return J({ ok: false }, 404);
+  const suppliedToken = req.headers.get("authorization")?.replace(/^Bearer /i, "") || url.searchParams.get("token");
+  if (!challenge || suppliedToken !== challenge) return J({ ok: false }, 404);
 
   const apiKey = Netlify.env.get("FIRECRAWL_API_KEY") || "";
   const errors: string[] = [];
   const candidates: Lead[] = [];
   let creditsUsed = 0;
 
-  for (const query of QUERIES) {
-    try {
-      const result = await search(query, apiKey);
-      creditsUsed += result.credits;
-      for (const { row, sourceType } of result.rows) {
-        const url = String(row.url || "").trim();
-        if (!url) continue;
-        const { score, signals } = scoreRow(row);
-        candidates.push({
-          url,
-          title: String(row.title || url),
-          description: String(row.description || row.snippet || "").slice(0, 700),
-          sourceType,
-          score,
-          status: statusFor(score),
-          signals,
-        });
+  const startedAt = Date.now();
+  // Two at a time: avoid serial latency without exceeding a small account limit.
+  for (let offset = 0; offset < QUERIES.length; offset += 2) {
+    const batch = await Promise.allSettled(QUERIES.slice(offset, offset + 2).map(query => search(query, apiKey)));
+    for (const outcome of batch) {
+      try {
+        if (outcome.status === "rejected") throw outcome.reason;
+        const result = outcome.value;
+        creditsUsed += result.credits;
+        for (const { row, sourceType } of result.rows) {
+          const url = String(row.url || "").trim();
+          if (!url) continue;
+          const { score, signals } = scoreRow(row);
+          candidates.push({
+            url,
+            title: String(row.title || url),
+            description: String(row.description || row.snippet || "").slice(0, 700),
+            sourceType,
+            score,
+            status: statusFor(score),
+            signals,
+            publishedAt: Number.isFinite(Date.parse(row.date || "")) ? new Date(row.date!).toISOString() : null,
+          });
+        }
+      } catch (error: any) {
+        errors.push(String(error?.message || "Firecrawl search failed").slice(0, 240));
       }
-    } catch (error: any) {
-      errors.push(String(error?.message || "Firecrawl search failed").slice(0, 240));
-    }
+  }
   }
 
   const bestByUrl = new Map<string, Lead>();
@@ -164,6 +175,9 @@ export default async (req: Request) => {
     mode: apiKey ? "authenticated" : "keyless",
     fetchedAt: new Date().toISOString(),
     creditsUsed,
+    durationMs: Date.now() - startedAt,
+    partial: errors.length > 0 && leads.length > 0,
+    persistence: { status: "not_enabled" },
     leadCount: leads.length,
     leads,
     errors,
