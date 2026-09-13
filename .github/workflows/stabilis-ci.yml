@@ -85,6 +85,8 @@ jobs:
           node --check assets/app.js
           node --check assets/app-modules.js
           node --check assets/ask-stabilis.js
+          node --check assets/control-room/engine.mjs
+          node --check assets/control-room/app.mjs
       - name: Static production build contract
         working-directory: .
         run: |
@@ -96,6 +98,7 @@ jobs:
           test -s security.html
           test -s privacy.html
           test -s terms.html
+          test -s control-room.html
           test -s resources.html
           test -s new-store-operational-readiness.html
           test -s off-premise-line-accuracy.html
@@ -105,6 +108,9 @@ jobs:
           test -s assets/stabilis.css
           test -s assets/app-modules.js
           test -s assets/ask-stabilis.js
+          test -s assets/control-room/control-room.css
+          test -s assets/control-room/engine.mjs
+          test -s assets/control-room/app.mjs
           test -s netlify/functions/ask-stabilis.mts
           test -s netlify/functions/stabilis-ai-health.mts
           test -s stabilis-release-marker.txt
