@@ -32,6 +32,7 @@ final class WorkspaceStore: ObservableObject {
 
     let webOrigin: URL
     let serviceName: String
+    let recoveryURL: URL?
     private let client: WorkspaceClient?
     private let demo = FictionalWorkspace()
     private var availableLocations: [Scope] = []
@@ -39,10 +40,11 @@ final class WorkspaceStore: ObservableObject {
     private var revision = UUID()
     private var restored = false
 
-    init(client: WorkspaceClient?, webOrigin: URL, serviceName: String) {
+    init(client: WorkspaceClient?, webOrigin: URL, serviceName: String, recoveryURL: URL? = nil) {
         self.client = client
         self.webOrigin = webOrigin
         self.serviceName = serviceName
+        self.recoveryURL = recoveryURL
     }
 
     var canSignIn: Bool { client != nil }
@@ -95,11 +97,11 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func sendRecovery(email: String) async -> Bool {
-        guard let client, !busy else { return false }
+        guard let client, let recoveryURL, !busy else { return false }
         let stamp = beginRead()
         defer { finishRead(stamp) }
         do {
-            try await client.requestRecovery(email: email.trimmingCharacters(in: .whitespacesAndNewlines), redirectTo: webOrigin.appendingPathComponent("login"))
+            try await client.requestRecovery(email: email.trimmingCharacters(in: .whitespacesAndNewlines), redirectTo: recoveryURL)
             guard revision == stamp else { return false }
             notice = "If this address belongs to a client account, check your inbox for the recovery link. Return here to sign in with your new password."
             return true
@@ -110,7 +112,9 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func startDemo() {
-        guard mode == .welcome, !busy else { return }
+        guard mode == .welcome else { return }
+        revision = UUID()
+        busy = false
         mode = .demo
         demoRole = .owner
         userID = FictionalWorkspace.managerID
@@ -138,15 +142,7 @@ final class WorkspaceStore: ObservableObject {
         let wasCustomer = mode == .customer
         let stamp = beginRead()
         mode = .welcome
-        organizations = []
-        availableLocations = []
-        locations = []
-        organizationID = nil
-        locationID = nil
-        reviews = []
-        assignees = []
-        requestedReview = nil
-        userID = nil
+        clearWorkspace()
         defer { finishRead(stamp) }
         if wasCustomer {
             do { try await client?.signOut() }
@@ -155,7 +151,7 @@ final class WorkspaceStore: ObservableObject {
     }
 
     func refresh() async {
-        guard mode == .customer, !saving else { return }
+        guard mode == .customer, !busy, !saving else { return }
         let stamp = beginRead()
         defer { finishRead(stamp) }
         do { try await loadWorkspace(stamp) }
@@ -184,11 +180,21 @@ final class WorkspaceStore: ObservableObject {
         guard let link = ReviewLink(url: url, webOrigin: webOrigin) else { return }
         pending = link
         if mode == .demo, !saving { await leave() }
-        if mode == .customer, !saving { await refresh() }
+        if mode == .customer, !saving {
+            let stamp = beginRead()
+            defer { finishRead(stamp) }
+            do { try await loadWorkspace(stamp) }
+            catch { show(error, stamp: stamp) }
+        }
     }
 
     func link(to review: Review) -> URL {
         ReviewLink(organization: review.organizationId, location: review.locationId, review: review.id).url(origin: webOrigin)
+    }
+
+    func rememberReview(_ id: UUID) {
+        guard mode == .customer, let userID, let review = reviews.first(where: { $0.id == id }) else { return }
+        UserDefaults.standard.set(link(to: review).absoluteString, forKey: resumeKey(userID))
     }
 
     func save(_ review: Review, operation: String, payload: [String: JSONValue] = [:]) async -> Bool {
@@ -196,7 +202,10 @@ final class WorkspaceStore: ObservableObject {
         saving = true
         error = nil
         notice = nil
-        defer { saving = false }
+        defer {
+            saving = false
+            if pending != nil, mode == .customer { Task { await refresh() } }
+        }
         do {
             let saved: Review
             if isDemo {
@@ -210,7 +219,7 @@ final class WorkspaceStore: ObservableObject {
             notice = ["assign": "Action assigned.", "accept": "Action accepted.", "request_change": "Change request sent.", "submit_evidence": "Evidence submitted.", "compare": "Weekly comparison saved.", "clarify": "Clarification requested.", "reopen": "Action reopened."][operation] ?? "Review updated."
             return true
         } catch {
-            self.error = error.localizedDescription
+            show(error, stamp: revision)
             return false
         }
     }
@@ -228,7 +237,36 @@ final class WorkspaceStore: ObservableObject {
     }
 
     private func show(_ failure: Error, stamp: UUID) {
-        if revision == stamp { error = failure.localizedDescription }
+        guard revision == stamp else { return }
+        if let issue = failure as? WorkspaceError {
+            switch issue {
+            case .signedOut:
+                mode = .welcome
+                clearWorkspace()
+            case .access:
+                reviews = []
+                assignees = []
+                requestedReview = nil
+            default: break
+            }
+        }
+        error = failure.localizedDescription
+    }
+
+    private func clearWorkspace() {
+        organizations = []
+        availableLocations = []
+        locations = []
+        organizationID = nil
+        locationID = nil
+        reviews = []
+        assignees = []
+        requestedReview = nil
+        userID = nil
+    }
+
+    private func resumeKey(_ id: UUID) -> String {
+        "stabilis-ios-last-review-\(serviceName)-\(webOrigin.host ?? "workspace")-\(id.uuidString)"
     }
 
     private func loadWorkspace(_ stamp: UUID) async throws {
@@ -240,7 +278,14 @@ final class WorkspaceStore: ObservableObject {
         userID = user
         organizations = orgs
         availableLocations = allLocations
-        let link = pending
+        let incoming = pending
+        let remembered: ReviewLink?
+        if organizationID == nil, let user, let saved = UserDefaults.standard.string(forKey: resumeKey(user)), let url = URL(string: saved) {
+            remembered = ReviewLink(url: url, webOrigin: webOrigin)
+        } else {
+            remembered = nil
+        }
+        let link = incoming ?? remembered
         if let link, orgs.contains(where: { $0.id == link.organization }),
            allLocations.contains(where: { $0.id == link.location && $0.organizationId == link.organization }) {
             organizationID = link.organization
@@ -249,13 +294,13 @@ final class WorkspaceStore: ObservableObject {
             guard revision == stamp else { return }
             pending = nil
             if reviews.contains(where: { $0.id == link.review }) { requestedReview = link.review }
-            else { error = "This review is unavailable. Check your access with your workspace administrator." }
+            else if incoming != nil { error = "This review is unavailable. Check your access with your workspace administrator." }
         } else {
             let selected = orgs.first(where: { $0.id == organizationID })?.id ?? orgs.first?.id
             organizationID = selected
             locations = allLocations.filter { $0.organizationId == selected }
             try await loadLocation(locations.first(where: { $0.id == locationID })?.id ?? locations.first?.id, stamp: stamp)
-            if link != nil, revision == stamp {
+            if incoming != nil, revision == stamp {
                 pending = nil
                 error = "This review is unavailable. Check your access with your workspace administrator."
             }
@@ -276,6 +321,8 @@ final class WorkspaceStore: ObservableObject {
         if canAssign {
             let roster = try await client.assignees(org: org, location: id)
             if revision == stamp, mode == .customer { assignees = roster }
+        } else {
+            assignees = []
         }
     }
 }

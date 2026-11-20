@@ -90,6 +90,7 @@ def browser_transport(route, address, database):
                 content = request.post_data_buffer
                 assert content is not None
                 database.run(
+                    "set request.storage_operation='storage.object.upload';"
                     "insert into storage.objects(bucket_id,name,metadata,contents) values ("
                     f"'stabilis-raw',{path},jsonb_build_object('size',{len(content)}),decode('{content.hex()}','hex'));",
                     actor=actor,

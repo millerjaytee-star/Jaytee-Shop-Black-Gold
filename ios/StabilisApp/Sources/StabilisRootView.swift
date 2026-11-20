@@ -25,10 +25,19 @@ struct StabilisRootView: View {
         }
         .task { await store.restore() }
         .onChange(of: store.requestedReview) { _, id in
-            if let id { path = [id] }
+            if let id {
+                path = [id]
+                store.requestedReview = nil
+            }
+        }
+        .onChange(of: path) { _, current in
+            if let id = current.last { store.rememberReview(id) }
         }
         .onChange(of: store.mode) { _, mode in
             if mode == .welcome { path = [] }
+        }
+        .onChange(of: scenePhase) { previous, current in
+            if previous != .active && current == .active { Task { await store.refresh() } }
         }
         .sheet(isPresented: $showSignIn) { SignInView(store: store) }
         .overlay {
@@ -62,7 +71,6 @@ struct StabilisRootView: View {
                             .font(.subheadline).foregroundStyle(StabilisStyle.secondary)
                         Button("Try fictional review") { store.startDemo() }
                             .buttonStyle(StabilisButtonStyle())
-                            .disabled(store.busy)
                             .accessibilityIdentifier("demo.open")
                     }
                 }
@@ -107,7 +115,14 @@ struct StabilisRootView: View {
                 customerSelection
             }
 
-            if let error = store.error { WorkspaceMessage(text: error, isError: true).listRowBackground(StabilisStyle.card) }
+            if let error = store.error {
+                WorkspaceMessage(text: error, isError: true).listRowBackground(StabilisStyle.card)
+                if !store.isDemo {
+                    Button("Reload workspace") { Task { await store.refresh() } }
+                        .disabled(store.busy || store.saving)
+                        .listRowBackground(StabilisStyle.card)
+                }
+            }
             if let notice = store.notice { WorkspaceMessage(text: notice).listRowBackground(StabilisStyle.card) }
             if store.busy { ProgressView("Loading weekly reviews…").listRowBackground(StabilisStyle.card) }
 
@@ -191,14 +206,20 @@ struct StabilisRootView: View {
         VStack(alignment: .leading, spacing: 2) {
             Link("Support and accessibility", destination: store.webOrigin.appendingPathComponent("support"))
             Link("Privacy policy", destination: store.webOrigin.appendingPathComponent("privacy"))
-            if let deletion = URL(string: "support#account-deletion", relativeTo: store.webOrigin.appendingPathComponent("/")) {
-                Link("Request account deletion", destination: deletion.absoluteURL)
+            if let deletion = accountDeletionURL {
+                Link("Request account deletion", destination: deletion)
             }
         }
         .font(.subheadline.weight(.medium))
         .buttonStyle(.plain)
         .foregroundStyle(StabilisStyle.accent)
         .lineSpacing(4)
+    }
+
+    private var accountDeletionURL: URL? {
+        var components = URLComponents(url: store.webOrigin.appendingPathComponent("support"), resolvingAgainstBaseURL: false)
+        components?.fragment = "account-deletion"
+        return components?.url
     }
 }
 
@@ -240,12 +261,16 @@ private struct SignInView: View {
                     if store.busy { ProgressView(recovery ? "Sending link…" : "Signing in…") }
                     if let error = store.error { WorkspaceMessage(text: error, isError: true) }
                     if let notice = store.notice { WorkspaceMessage(text: notice) }
-                    Button(recovery ? "Back to sign in" : "Reset password") {
-                        recovery.toggle()
-                        password = ""
-                        focus = .email
+                    if store.recoveryURL != nil {
+                        Button(recovery ? "Back to sign in" : "Reset password") {
+                            recovery.toggle()
+                            password = ""
+                            focus = .email
+                        }
+                        .disabled(store.busy)
+                    } else {
+                        Link("Get sign-in help", destination: store.webOrigin.appendingPathComponent("support"))
                     }
-                    .disabled(store.busy)
                 }
             }
             .navigationTitle(recovery ? "Password recovery" : "Client sign in")

@@ -4,6 +4,8 @@ create schema auth;
 create role authenticated;
 create role anon;
 create schema storage;
+create function storage.allow_any_operation(operations text[]) returns boolean language sql stable as
+  $$ select coalesce(current_setting('request.storage_operation',true) = any(operations),false) $$;
 create table storage.buckets(id text primary key, public boolean not null);
 create table storage.objects(bucket_id text references storage.buckets(id), name text, metadata jsonb, contents bytea,
   primary key (bucket_id,name));

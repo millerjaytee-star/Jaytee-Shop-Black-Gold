@@ -20,7 +20,17 @@ struct StabilisApp: App {
         } else {
             client = nil
         }
-        _store = StateObject(wrappedValue: WorkspaceStore(client: client, webOrigin: origin, serviceName: "Stabilis"))
+        let recoveryURL: URL?
+        if let raw = configuration.object(forInfoDictionaryKey: "StabilisRecoveryURL") as? String,
+           let url = URL(string: raw), url.scheme == "https", url.host != nil,
+           url.user == nil, url.password == nil, url.query == nil, url.fragment == nil {
+            recoveryURL = url
+        } else {
+            recoveryURL = nil
+        }
+        _store = StateObject(wrappedValue: WorkspaceStore(
+            client: client, webOrigin: origin, serviceName: "Stabilis", recoveryURL: recoveryURL
+        ))
     }
 
     var body: some Scene {

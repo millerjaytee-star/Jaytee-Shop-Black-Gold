@@ -53,7 +53,7 @@ class Database:
     def run(self, statement, *, actor=None, role="authenticated", error=None):
         if actor or role == "anon":
             principal = f"set request.jwt.claim.sub={literal(actor)};" if actor else ""
-            statement = f"set role {role}; {principal} {statement}"
+            statement = f"set role {role}; set request.storage_operation='storage.object.get_authenticated'; {principal} {statement}"
         result = subprocess.run(
             [
                 self.psql,
@@ -445,12 +445,14 @@ def test_weekly_private_source_storage_and_version_history(db):
     path = literal(entry["path"])
     file_id = literal(entry["id"])
     insert = (
+        "set request.storage_operation='storage.object.upload';"
         "insert into storage.objects(bucket_id,name,metadata) "
         f"""values ('stabilis-raw',{path},'{{"size":10}}');"""
     )
     complete = f"select public.stabilis_finish_weekly_source('{ORG}','{LOCATION}',{file_id});"
     count = f"select count(*) from storage.objects where name={path};"
     db.run(complete, actor=ANALYST, error="could not be confirmed")
+    db.run(insert.replace('storage.object.upload','storage.object.sign_upload_url'), actor=ANALYST, error="row-level security")
     db.run(insert, actor=OWNER, error="row-level security")
     db.run(insert, role="anon", error="row-level security")
     db.run(insert, actor=ANALYST)
@@ -459,6 +461,7 @@ def test_weekly_private_source_storage_and_version_history(db):
     db.run(complete, actor=ANALYST)
     assert prepare(ANALYST)["archived"]
     assert db.run(count, actor=ANALYST) == 1
+    assert db.run("set request.storage_operation='storage.object.sign';"+count, actor=ANALYST) == 0
     assert db.run(count, actor=OWNER) == db.run(count, actor=OUTSIDE) == db.run(count, role="anon") == 0
     db.run(f"delete from storage.objects where name={path};", actor=ANALYST)
     db.run(f"update storage.objects set metadata=null where name={path};", actor=ANALYST)

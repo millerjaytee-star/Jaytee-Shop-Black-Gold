@@ -189,11 +189,14 @@ actor WorkspaceClient {
     private func authorized<T: Decodable & Sendable>(_ endpoint: String, payload: [String: JSONValue]? = nil) async throws -> T {
         let operation = generation
         let first = try await currentCredentials()
+        guard generation == operation else { throw WorkspaceError.signedOut }
         let result: T
         do {
             result = try await send(endpoint, payload: payload, bearer: first.accessToken)
         } catch WorkspaceError.signedOut {
+            guard generation == operation else { throw WorkspaceError.signedOut }
             let next = try await currentCredentials(expiredToken: first.accessToken)
+            guard generation == operation else { throw WorkspaceError.signedOut }
             result = try await send(endpoint, payload: payload, bearer: next.accessToken)
         }
         guard generation == operation else { throw WorkspaceError.signedOut }

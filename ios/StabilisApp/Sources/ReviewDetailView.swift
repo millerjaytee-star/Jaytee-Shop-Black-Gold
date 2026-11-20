@@ -227,7 +227,8 @@ struct ReviewDetailView: View {
                     ShareLink(item: store.link(to: review)) { Label("Share access link", systemImage: "link") }
                         .buttonStyle(StabilisButtonStyle(primary: false))
                 }
-                ShareLink(item: PrintableReview(text: review.shareText(location: store.locationName, demo: store.isDemo))) {
+                ShareLink(item: PrintableReview(text: review.shareText(location: store.locationName, demo: store.isDemo)),
+                          preview: SharePreview("Weekly labor review", image: Image(systemName: "doc.text"))) {
                     Label("Share review summary", systemImage: "square.and.arrow.up")
                 }
                 .buttonStyle(StabilisButtonStyle(primary: false))

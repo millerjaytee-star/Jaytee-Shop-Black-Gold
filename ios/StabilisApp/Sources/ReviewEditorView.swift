@@ -144,7 +144,7 @@ struct ReviewEditorView: View {
                         Text(field.name).font(.subheadline).foregroundStyle(StabilisStyle.secondary)
                         TextField("Enter value", text: Binding(get: { inputs[field.key] ?? "" }, set: { inputs[field.key] = $0 }))
                             .keyboardType(.decimalPad)
-                            .accessibilityLabel(field.name)
+                            .accessibilityLabel(Text(verbatim: field.name))
                     }
                 }
             } header: {
@@ -174,7 +174,7 @@ struct ReviewEditorView: View {
     private func noteField(label: String) -> some View {
         TextEditor(text: $note)
             .frame(minHeight: 105)
-            .accessibilityLabel(label)
+            .accessibilityLabel(Text(verbatim: label))
             .accessibilityIdentifier(editor == .evidence ? "review.evidenceNote" : "review.note")
     }
 

@@ -42,6 +42,7 @@ struct StabilisCard<Content: View>: View {
 
 struct StabilisButtonStyle: ButtonStyle {
     var primary = true
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -53,7 +54,7 @@ struct StabilisButtonStyle: ButtonStyle {
             .foregroundStyle(primary ? StabilisStyle.accentText : StabilisStyle.accent)
             .background(primary ? StabilisStyle.accent : StabilisStyle.card, in: RoundedRectangle(cornerRadius: 9))
             .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(primary ? Color.clear : StabilisStyle.rule))
-            .opacity(configuration.isPressed ? 0.75 : 1)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.55)
     }
 }
 

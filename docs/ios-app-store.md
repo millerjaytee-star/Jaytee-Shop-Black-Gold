@@ -55,7 +55,7 @@ Use after verifying it against the submitted build and selecting a distribution 
 >
 > Open the fictional Juniper Café review to see the baseline with $450 over target. It breaks down to $0 from the schedule against target, $250 from sales below forecast and $200 from actual payroll above schedule. The comparison week shows $125 over target. The $325 observed improvement and $0 client-verified impact are distinct measures.
 >
-> For the authenticated workflow, use the supplied synthetic organization credentials. Open the assigned weekly action, accept it, submit evidence, and view the follow-up. The reviewer account has access to a synthetic location. The app’s support and privacy options are in Settings.
+> For the authenticated workflow, use the supplied synthetic organization credentials. Open the assigned weekly action, accept it, submit evidence, and view the follow-up. The reviewer account has access to a synthetic location. Support and privacy links appear on the welcome screen and in the workspace.
 
 For an Unlisted request, add that the audience is invited restaurant managers and operators across separate organizations, including staff on personally owned devices. Supply an exact build-specific route through the screens, any second-role test credentials, relevant sample input and the availability window. [App Review information](https://developer.apple.com/help/app-review/before-submitting-for-review/complete-review/)
 
@@ -96,4 +96,4 @@ xcodebuild -project ios/Stabilis.xcodeproj -scheme Stabilis -configuration Relea
 
 The UI suite captures the welcome screen, historical variance, GM assignment, evidence entry and comparison result using fictional records. The compact and large iPhone CI jobs retain the screenshots, unsigned simulator builds and result bundles. The compact job also attempts an unsigned device archive. A signed distribution archive and TestFlight upload use the Apple team steps above.
 
-The build workspace runs Linux and has no Xcode toolchain or connected App Store Connect integration. GitHub's integration returned HTTP 403 on a read-only signing configuration check. Apple team membership, bundle ID availability, signing and upload require a verified Apple account and Mac or authorized macOS runner. Signed archive, actual screenshots, hosted reviewer sign-in, support routing and a TestFlight build need direct verification before claiming release readiness.
+The interactive workspace runs Linux. GitHub Actions provides the macOS simulator and unsigned archive checks. The workspace has no connected App Store Connect integration. GitHub's integration returned HTTP 403 on a read-only signing configuration check. Apple team membership, bundle ID availability, signing and upload require a verified Apple account and Mac or authorized macOS runner. Signed archive, actual screenshots, hosted reviewer sign-in, support routing and a TestFlight build need direct verification before claiming release readiness.

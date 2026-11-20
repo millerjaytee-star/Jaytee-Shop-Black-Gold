@@ -27,6 +27,7 @@
     </dict></array>
     <key>StabilisSupabaseURL</key><string>$(STABILIS_SUPABASE_URL)</string>
     <key>StabilisSupabasePublishableKey</key><string>$(STABILIS_SUPABASE_PUBLISHABLE_KEY)</string>
+    <key>StabilisRecoveryURL</key><string>$(STABILIS_RECOVERY_URL)</string>
     <key>UIApplicationSceneManifest</key>
     <dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
     <key>UILaunchScreen</key><dict/>

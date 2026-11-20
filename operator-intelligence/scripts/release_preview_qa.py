@@ -28,6 +28,8 @@ ROUTES = [
     "/resources",
     "/reset",
     "/thanks.html",
+    "/support",
+    "/support-received",
     "/login",
     "/app",
     "/security",
@@ -234,6 +236,26 @@ def keyboard_and_static_content(browser: Browser) -> None:
     print("Mobile keyboard, chart text and static offer/contact: PASS")
 
 
+def mobile_review_handoff(browser: Browser) -> None:
+    page = browser.new_page(viewport=VIEWPORTS[-1][1])
+    identifiers = [f"00000000-0000-4000-8000-{i:012d}" for i in range(1, 4)]
+    organization, location, review = identifiers
+    response = page.goto(BASE + "/mobile/review/" + "/".join(identifiers))
+    assert response and response.ok
+    assert "no-store" in response.headers.get("cache-control", "")
+    expect(page.get_by_role("link", name="Open in the iPhone app")).to_have_attribute(
+        "href", f"stabilis://review/{organization}/{location}/{review}",
+    )
+    expect(page.get_by_role("link", name="Open the web workspace")).to_have_attribute(
+        "href", f"/app#labor-review/{location}/{review}",
+    )
+    page.get_by_role("link", name="Open the web workspace").click()
+    expect(page.get_by_role("heading", name="Sign in", exact=True)).to_be_visible()
+    assert "labor-review%2F" in page.url
+    page.close()
+    print("Mobile review link preserves the authorized web destination: PASS")
+
+
 def demo_deep_links(browser: Browser) -> None:
     context = browser.new_context(viewport={"width": 1440, "height": 1000})
     page = context.new_page()
@@ -433,6 +455,7 @@ def main() -> None:
             for label, viewport in VIEWPORTS:
                 visit(browser, label, viewport)
             keyboard_and_static_content(browser)
+            mobile_review_handoff(browser)
             demo_deep_links(browser)
             labor_review_journey(browser)
             check_daily_import(browser)

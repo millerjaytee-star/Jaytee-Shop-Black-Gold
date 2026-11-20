@@ -5,8 +5,9 @@ begin;
 do $$
 begin
   if not exists (select 1 from storage.buckets where id='stabilis-raw' and not public)
-     or not exists (select 1 from pg_class where oid='storage.objects'::regclass and relrowsecurity) then
-    raise exception 'Weekly archives require the existing private stabilis-raw bucket and Storage RLS';
+     or not exists (select 1 from pg_class where oid='storage.objects'::regclass and relrowsecurity)
+     or to_regprocedure('storage.allow_any_operation(text[])') is null then
+    raise exception 'Weekly archives require the private stabilis-raw bucket, Storage RLS and operation-aware policies';
   end if;
 end $$;
 
@@ -54,10 +55,12 @@ grant execute on function public.stabilis_weekly_source_object_access(text,boole
 -- Restrictive policies guard the reserved folder even when a broader legacy tenant policy applies.
 create policy weekly_labor_source_read_limit on storage.objects as restrictive for select
 using (case when bucket_id='stabilis-raw' and split_part(name,'/',2)='weekly-labor'
-  then public.stabilis_weekly_source_object_access(name,false) else true end);
+  then storage.allow_any_operation(array['storage.object.get_authenticated','object.get_authenticated_info'])
+    and public.stabilis_weekly_source_object_access(name,false) else true end);
 create policy weekly_labor_source_write_limit on storage.objects as restrictive for insert
 with check (case when bucket_id='stabilis-raw' and split_part(name,'/',2)='weekly-labor'
-  then public.stabilis_weekly_source_object_access(name,true) else true end);
+  then storage.allow_any_operation(array['storage.object.upload'])
+    and public.stabilis_weekly_source_object_access(name,true) else true end);
 create policy weekly_labor_source_no_replace on storage.objects as restrictive for update
 using (bucket_id<>'stabilis-raw' or split_part(name,'/',2)<>'weekly-labor')
 with check (bucket_id<>'stabilis-raw' or split_part(name,'/',2)<>'weekly-labor');
