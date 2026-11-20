@@ -54,3 +54,9 @@ The new deploy preview and loopback server use a public-only browser configurati
 Weekly mapping persists the confirmed aggregates, coverage and source references. Original reports can go through the existing private intake subject to signed storage and retention terms. The weekly UI does not create a managed association to a private raw file, preserve role/daypart fact series, or automate promotion of a finding into a signed diagnostic readout or 90-day roadmap. An analyst can use the linked review and inventory evidence in the existing diagnostic process.
 
 The fit-call form kept its registered Netlify name and fields. Hosted receipt and notification delivery were not exercised with a live submission. A working 20-minute booking event has not been verified. Real sessions, operator interviews, cleared payments, comparison with an operator’s existing tool, repeat use and release approval require real evidence or authorization.
+
+## Local verification results
+
+- 56 Python tests passed with disposable PostgreSQL 17 and Chromium. The private browser cycle used six synthetic identities and a test auth/REST transport. Node passed all six test files. Ruff, mypy, compile, asset syntax and static publish checks passed.
+- The pipeline reproduced $392,570.56 in Harbor & Hearth modeled opportunity. Tests covered the $450 bridge, missing forecast, zero sales, overruns at actual scheduled/payroll rates, corrected and duplicate imports, repeated and concurrent writes, overdue action, incomparable and worse results, and evidence permissions.
+- Rendered the homepage, form, login and review at 390, 820 and 1440 pixels. Checked keyboard focus and menu dismissal, accessible chart text, and the public offer with JavaScript disabled. The reviewed mobile accessibility scans found no automated WCAG A/AA findings on the tested key public screens. The completed fictional review produced a one-page Letter PDF.
