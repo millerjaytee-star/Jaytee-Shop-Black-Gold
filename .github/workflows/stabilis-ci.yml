@@ -8,11 +8,13 @@ on:
       - 'assets/**'
       - 'netlify/**'
       - 'tests/**'
+      - 'scripts/sync-founding-offer.mjs'
       - 'operator-intelligence/**'
       - '_redirects'
       - 'netlify.toml'
       - 'stabilis-config.js'
       - 'stabilis-release-marker.txt'
+      - 'favicon.ico'
       - '.github/workflows/stabilis-ci.yml'
   push:
     branches: [main]
@@ -22,11 +24,13 @@ on:
       - 'assets/**'
       - 'netlify/**'
       - 'tests/**'
+      - 'scripts/sync-founding-offer.mjs'
       - 'operator-intelligence/**'
       - '_redirects'
       - 'netlify.toml'
       - 'stabilis-config.js'
       - 'stabilis-release-marker.txt'
+      - 'favicon.ico'
       - '.github/workflows/stabilis-ci.yml'
 
 permissions:
@@ -43,7 +47,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Opportunity Scout behavior tests
+      - name: Browser module behavior tests
         working-directory: .
         run: node --experimental-strip-types --test tests/*.test.mjs
       - uses: actions/setup-python@v5
@@ -92,7 +96,15 @@ jobs:
       - name: Static production build contract
         working-directory: .
         run: |
-          test -s index.html
+          python operator-intelligence/scripts/build_site.py
+          test ! -e dist/netlify/docs
+          test ! -e dist/netlify/operator-intelligence
+          test ! -e dist/netlify/netlify
+          test -s dist/netlify/_redirects
+          test -s dist/netlify/assets/labor-examples/weekly-reports.xlsx
+          test -s dist/netlify/favicon.ico
+          grep -q 'preview: true' dist/netlify/stabilis-config.js
+          test -s dist/netlify/index.html
           test -s operator-intelligence.html
           test -s operator-intelligence-report.html
           test -s login.html

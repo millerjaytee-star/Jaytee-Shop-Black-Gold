@@ -1,3 +1,5 @@
+import {calculateExample, exampleInputs, exampleWeeks} from './labor-example.js';
+
 (() => {
   const nav = document.getElementById('siteNav');
   const menu = document.querySelector('.menu-toggle');
@@ -18,46 +20,34 @@
       menu.focus();
     }
   });
+  nav.setAttribute('data-menu-ready', '');
 
-  // Fictional, aggregate café records. Both weeks have the same forecast, target and schedule.
-  const weeks = [
-    { sales: [1100, 1150, 1200, 1250, 1500, 1550, 1250], hours: [14, 14, 16, 19, 25, 26, 21] },
-    { sales: [1200, 1250, 1300, 1300, 1500, 1650, 1300], hours: [14, 15, 16, 18, 21, 23, 18] }
-  ];
-  const forecastSales = 10000;
-  const scheduledHours = 125;
-  const hourlyRate = 20;
-  const target = 0.25;
   const maxChartPercent = 40;
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const dollars = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-  const sum = values => values.reduce((total, value) => total + value, 0);
   const controls = [...document.querySelectorAll('[data-week]')];
   const bars = [...document.querySelectorAll('#chartBars .bar')];
 
   function showWeek(index) {
-    const week = weeks[index];
-    const actualSales = sum(week.sales);
-    const scheduledPay = scheduledHours * hourlyRate;
-    const actualPay = sum(week.hours) * hourlyRate;
-    const weeklyRate = (100 * actualPay / actualSales).toFixed(1);
-    const salesEffect = target * (forecastSales - actualSales);
-    const payrollEffect = actualPay - scheduledPay;
-    const gap = actualPay - target * actualSales;
-    const dailyPercentages = week.hours.map((hours, day) => 100 * hours * hourlyRate / week.sales[day]);
+    const week = exampleWeeks[index];
+    const inputs = exampleInputs[index];
+    const metrics = calculateExample(inputs);
+    const weeklyRate = metrics.actual_pct.toFixed(1);
+    const dailyPercentages = week.paid.map((paid, day) => 100 * paid / week.sales[day]);
     controls.forEach((button, i) => button.setAttribute('aria-pressed', String(i === index)));
     bars.forEach((bar, day) => {
       const percent = dailyPercentages[day];
       bar.style.setProperty('--height', (100 * percent / maxChartPercent).toFixed(2) + '%');
-      bar.classList.toggle('above', percent > target * 100);
+      bar.classList.toggle('above', percent > inputs.target_pct);
       bar.title = days[day] + ': ' + percent.toFixed(1) + '%';
     });
-    document.getElementById('laborGap').textContent = dollars.format(gap);
+    document.getElementById('laborGap').textContent = dollars.format(metrics.total_over);
     document.getElementById('laborPct').textContent = weeklyRate + '%';
-    document.getElementById('salesEffect').textContent = dollars.format(salesEffect);
-    document.getElementById('payrollEffect').textContent = dollars.format(payrollEffect);
-    document.getElementById('chartDescription').textContent = 'Week ' + (index + 1) + ' daily labor percentages, Monday through Sunday: ' + dailyPercentages.map(value => value.toFixed(1)).join(', ') + '. Target: 25%.';
-    document.getElementById('weekSummary').textContent = 'Week ' + (index + 1) + '. Labor is ' + weeklyRate + '% of sales and ' + dollars.format(gap) + ' over target. Sales account for ' + dollars.format(salesEffect) + ' and extra payroll for ' + dollars.format(payrollEffect) + '.';
+    document.getElementById('scheduleEffect').textContent = dollars.format(metrics.schedule_effect);
+    document.getElementById('salesEffect').textContent = dollars.format(metrics.sales_effect);
+    document.getElementById('payrollEffect').textContent = dollars.format(metrics.payroll_effect);
+    document.getElementById('chartDescription').textContent = `Week ${index + 1} daily labor percentages. ${dailyPercentages.map((value, day) => `${days[day]} ${value.toFixed(1)}%`).join(', ')}. Weekly labor is ${weeklyRate}% of sales against a ${inputs.target_pct}% target.`;
+    document.getElementById('weekSummary').textContent = `Week ${index + 1}. Labor is ${weeklyRate}% of sales and ${dollars.format(metrics.total_over)} over target. Schedule above budget ${dollars.format(metrics.schedule_effect)}, sales effect ${dollars.format(metrics.sales_effect)}, and payroll above schedule ${dollars.format(metrics.payroll_effect)}.`;
   }
 
   controls.forEach((button, index) => button.addEventListener('click', () => showWeek(index)));

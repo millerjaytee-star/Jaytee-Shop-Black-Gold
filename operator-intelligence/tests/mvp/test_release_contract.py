@@ -40,7 +40,7 @@ def test_public_demo_contract():
     assert 'HHR-07' in demo_data and '102844.37' in demo_data
     assert 'location/' in demo_app
 
-    assert 'Modeled Recoverable' in report
+    assert all(label in report for label in ('Modeled opportunity', 'Observed change', 'Client-verified financial impact'))
     assert 'Verified Value' in report
     assert '$392,570.56' in report
 

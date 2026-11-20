@@ -23,6 +23,11 @@ ROUTES = [
     "/labor-review",
     "/operator-intelligence",
     "/operator-intelligence-report",
+    "/proof-ledger",
+    "/control-room",
+    "/resources",
+    "/reset",
+    "/thanks.html",
     "/login",
     "/app",
     "/security",
@@ -196,6 +201,35 @@ def visit(browser: Browser, label: str, viewport: dict[str, int]) -> None:
     print(f"{label}: routes/console/assets/responsive PASS")
 
 
+def keyboard_and_static_content(browser: Browser) -> None:
+    context = browser.new_context(viewport=VIEWPORTS[-1][1])
+    page = context.new_page()
+    page.goto(BASE)
+    page.keyboard.press("Tab")
+    skip = page.get_by_role("link", name="Skip to content")
+    expect(skip).to_be_focused()
+    page.keyboard.press("Enter")
+    assert page.url.endswith("#main")
+    chart = page.locator("#heroLab")
+    week = chart.get_by_role("button", name="Week 2")
+    week.focus()
+    page.keyboard.press("Enter")
+    expect(week).to_have_attribute("aria-pressed", "true")
+    expect(chart.locator("figcaption")).to_contain_text("26.3%")
+    context.close()
+
+    context = browser.new_context(viewport=VIEWPORTS[-1][1], java_script_enabled=False)
+    page = context.new_page()
+    page.goto(BASE)
+    expect(page.get_by_role("heading", name="14-Day Margin Recovery Diagnostic")).to_be_visible()
+    expect(page.get_by_text("$1,500", exact=True)).to_be_visible()
+    expect(page.get_by_role("link", name="Request a 20-minute fit call").first).to_be_visible()
+    expect(page.get_by_role("link", name="Client login").first).to_be_visible()
+    expect(page.locator('form[name="stabilis-pilot"]')).to_have_attribute("action", "/thanks.html")
+    context.close()
+    print("Mobile keyboard, chart text and static offer/contact: PASS")
+
+
 def demo_deep_links(browser: Browser) -> None:
     context = browser.new_context(viewport={"width": 1440, "height": 1000})
     page = context.new_page()
@@ -230,8 +264,25 @@ def labor_review_journey(browser: Browser) -> None:
     expect(page.locator(".lr-big")).to_contain_text("$450")
     expect(page.locator(".lr-break")).to_contain_text("$250")
     expect(page.locator(".lr-break")).to_contain_text("$200")
+    page.get_by_text("Show the math and source records", exact=True).click()
+    expect(page.get_by_text("$2,700 − (25% × $9,000) = $450", exact=True)).to_be_visible()
+    page.get_by_text("Show the math and source records", exact=True).click()
+    scenario = page.locator("#labor-scenario")
+    scenario_result = page.locator("#scenario-output")
+    for case, total, explanation in [
+        ("schedule", "$200", "Paid hours matched the schedule."),
+        ("sales", "$250", "Sales finished $1,000 below forecast."),
+        ("missing-forecast", "$450", "Add the sales forecast for this location and fiscal week"),
+        ("varying-rates", "$125", "Paid hours matched the schedule."),
+        ("zero-sales", "$2,700", "A labor percentage is undefined."),
+    ]:
+        scenario.select_option(case)
+        expect(scenario_result.locator(".lr-big")).to_have_text(total)
+        expect(scenario_result).to_contain_text(explanation)
+    scenario.select_option("")
     role.select_option("READ_ONLY")
     expect(page.locator('form[data-op="assign"]')).to_have_count(0)
+    expect(role).to_be_focused()
     role.select_option("OWNER_EXECUTIVE")
 
     def submission(operation):
@@ -241,6 +292,9 @@ def labor_review_journey(browser: Browser) -> None:
     page.locator('[data-op="assign"] [name="title"]').fill(title)
     submission("assign").click()
     role.select_option("GENERAL_MANAGER")
+    page.reload(wait_until="networkidle")
+    expect(role).to_have_value("GENERAL_MANAGER")
+    expect(page.locator(".lr-grid h2").first).to_have_text("Action and follow-through")
     expect(page.get_by_text(title, exact=True)).to_be_visible()
     submission("accept").click()
     evidence = "QA example: shift lead matched all seven close schedules to paid hours."
@@ -251,6 +305,7 @@ def labor_review_journey(browser: Browser) -> None:
     submission("compare").click()
     results = page.locator("section").filter(has=page.get_by_role("heading", name="Results", exact=True)).last
     expect(results).to_contain_text("$325")
+    expect(results).to_contain_text("Labor variance improved by $325.")
     expect(results).to_contain_text("$0")
     expect(page.locator('form[data-op="verify"]')).to_have_count(1)
     page.reload(wait_until="networkidle")
@@ -270,6 +325,7 @@ def labor_review_journey(browser: Browser) -> None:
     expect(results.locator("dt").get_by_text("Client-verified financial impact").locator("..")).to_contain_text("$125")
     page.emulate_media(media="print")
     expect(page.locator("[data-print]")).to_be_hidden()
+    expect(scenario).to_be_hidden()
     expect(results).to_be_visible()
     page.emulate_media(media="screen")
 
@@ -289,14 +345,14 @@ def labor_review_journey(browser: Browser) -> None:
     role.select_option("OWNER_EXECUTIVE")
     expect(page.locator('select[name="review-id"] option')).to_have_count(1)
     role.select_option("STABILIS_ANALYST")
-    page.locator('select[name="review-id"]').select_option(label="Oct 26, 2026")
+    page.locator('select[name="review-id"]').select_option(label="Oct 26, 2026 · Analyst review")
     submission("release").click()
     role.select_option("OWNER_EXECUTIVE")
     expect(page.locator('select[name="review-id"] option')).to_have_count(2)
     assert not writes, "Fictional demo sent a write request"
     assert not errors, "weekly review browser errors:\n" + "\n".join(errors)
     context.close()
-    print("Mobile owner–GM action, finance review, print, private draft and CSV intake: PASS")
+    print("Mobile owner–GM action, role persistence, variance cases, finance review, print, private draft and CSV intake: PASS")
 
 
 def check_daily_import(browser: Browser) -> None:
@@ -336,6 +392,34 @@ def check_daily_import(browser: Browser) -> None:
     print("Mobile multi-report XLSX mapping, totals and source references: PASS")
 
 
+def check_control_room(browser: Browser) -> None:
+    page = browser.new_page(viewport=VIEWPORTS[-1][1])
+    page.goto(BASE)
+    page.get_by_role("link", name="Open the local Control Room").click()
+    page.get_by_role("button", name="Operating inputs").click()
+    page.get_by_label("Location name").fill("Fictional training café")
+    page.get_by_label("Net sales ($)").fill("9000")
+    page.get_by_label("Loaded labor cost ($)").fill("2700")
+    page.get_by_label("Labor target (%)").fill("25")
+    page.get_by_role("button", name="Save location & diagnose").click()
+    expect(page.locator(".hero-stat .stat-value")).to_have_text("$450")
+
+    page.get_by_role("button", name="Data & reports").click()
+    upload = page.get_by_label("Choose CSV file")
+    upload.set_input_files({
+        "name": "training.csv", "mimeType": "text/csv",
+        "buffer": b"location,sales\nSecond training cafe,5000\n",
+    })
+    expect(page.locator("#notice")).to_contain_text("Imported 1 location")
+    page.get_by_role("button", name="Save period snapshot").click()
+    expect(page.locator("#snapshot-list").get_by_role("button")).to_have_count(1)
+    page.reload()
+    for name in ("Fictional training café", "Second training cafe"):
+        expect(page.get_by_role("cell", name=name)).to_be_visible()
+    page.close()
+    print("Control Room manual entry, CSV append, snapshot and refresh: PASS")
+
+
 def main() -> None:
     wait_for_preview()
     check_headers()
@@ -344,9 +428,11 @@ def main() -> None:
         try:
             for label, viewport in VIEWPORTS:
                 visit(browser, label, viewport)
+            keyboard_and_static_content(browser)
             demo_deep_links(browser)
             labor_review_journey(browser)
             check_daily_import(browser)
+            check_control_room(browser)
         finally:
             browser.close()
     print("STABILIS DEPLOY PREVIEW BROWSER QA = PASS")

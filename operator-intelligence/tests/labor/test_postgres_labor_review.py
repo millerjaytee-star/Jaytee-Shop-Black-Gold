@@ -27,6 +27,7 @@ INPUT = dict(
     actual_cost=2700,
 )
 NEXT = dict(INPUT, actual_sales=10000, actual_hours=125, actual_cost=2500)
+ACTION_EVIDENCE = {"target_measure": "Paid hours within schedule", "evidence_required": "Daily closing punch totals"}
 
 
 def uid(number):
@@ -225,7 +226,7 @@ def assigned(db, week=WEEK):
     return db.save(
         OWNER,
         "assign",
-        {"title": "Review closing hours", "assignee_id": GM, "due_date": "2025-12-10", "next_review": "2025-12-11"},
+        {**ACTION_EVIDENCE, "title": "Review closing hours", "assignee_id": GM, "due_date": "2025-12-10", "next_review": "2025-12-11"},
         released,
     )
 
@@ -245,6 +246,24 @@ def test_permissions_and_draft_revisions(db):
     db.read(OWNER, OUTSIDE_LOCATION, error="Location unavailable")
     db.read(None, role="anon", error="permission denied")
     db.run("select * from stabilis.weekly_labor_reviews", actor=GM, error="permission denied")
+    db.run(f"select public.stabilis_labor_assignees('{ORG}','{LOCATION}')", actor=VIEWER, error="Leader access required")
+
+
+def test_released_correction_requires_review_and_preserves_previous_decision(db):
+    initial = assigned(db, "2025-08-03")
+    correction = {"inputs": NEXT, "source": "Corrected payroll", "note": "Replace duplicate punch", "week_start": initial["week_start"]}
+    db.save(OWNER, "correct", correction, initial, error="Analyst access")
+    db.save(ANALYST, "correct", dict(correction, week_start="2025-08-10"), initial, error="original fiscal week")
+    revised = db.save(ANALYST, "correct", correction, initial)
+    assert revised["id"] == initial["id"] and revised["status"] == "draft"
+    assert revised["action"] is None and revised["metrics"]["total_over"] == 0
+    assert not any(record["id"] == revised["id"] for record in db.read(OWNER))
+    previous = db.run(
+        f"select previous_state from stabilis.weekly_labor_audit where review_id='{revised['id']}' and version={revised['version']}"
+    )
+    assert previous["action"]["assignee_id"] == GM and previous["metrics"]["total_over"] == 450
+    released = db.save(ANALYST, "release", {"note": "Corrected payroll checked"}, revised)
+    assert any(record["id"] == released["id"] for record in db.read(OWNER))
 
 
 def test_review_and_retries(db):
@@ -255,12 +274,17 @@ def test_review_and_retries(db):
     row = db.save(
         AREA,
         "assign",
-        {"title": "Review closing hours", "assignee_id": GM, "due_date": WEEK2, "next_review": WEEK2},
+        {**ACTION_EVIDENCE, "title": "Review closing hours", "assignee_id": GM, "due_date": WEEK2, "next_review": WEEK2},
         changed,
     )
     accepted = db.save(GM, "accept", {}, row)
     assert db.save(GM, "accept", {}, row)["version"] == accepted["version"]
     evidence = db.save(GM, "submit_evidence", {"note": "Signed closing schedule in folder A"}, accepted)
+    db.save(VIEWER, "clarify", {"note": "Add punches"}, evidence, error="reviewer or leader access required")
+    clarified = db.save(OWNER, "clarify", {"note": "Include the paid closing punch totals"}, evidence)
+    assert clarified["status"] == "accepted" and clarified["action"].get("evidence") is None
+    evidence = db.save(GM, "submit_evidence", {"note": "Closing schedule and punch totals in folder A"}, clarified)
+    assert evidence["action"].get("clarification") is None
     compared = db.save(
         ANALYST,
         "compare",
@@ -313,7 +337,7 @@ def test_incomparable_worse_and_concurrent_updates(db):
         row = db.save(
             OWNER,
             "assign",
-            {"title": "Review closing hours", "assignee_id": GM, "due_date": "2025-10-26", "next_review": "2025-10-26"},
+            {**ACTION_EVIDENCE, "title": "Review closing hours", "assignee_id": GM, "due_date": "2025-10-26", "next_review": "2025-10-26"},
             row,
         )
         row = db.save(GM, "accept", {}, row)
@@ -330,6 +354,8 @@ def test_incomparable_worse_and_concurrent_updates(db):
     row = db.save(ANALYST, "compare", dict(follow, comparable=True, note="Matched opening hours after review"), row)
     assert row["followup"]["observed_change"] == -100
     db.save(OWNER, "verify", {"amount": 100}, row, error="positive comparable change")
+    assert row["action"]["evidence"] == "Revised schedule posted"
+    assert row["followup"]["reviewed_by"] == ANALYST and row["followup"]["reviewed_at"]
 
 
 def test_revoked_location_grant_removes_roster_and_blocks_actions(db):

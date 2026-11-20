@@ -19,7 +19,7 @@ async function workbook(file) {
   return { names: ["Delimited report"], rows: async () => rows };
 }
 
-export function openLaborImport(form, { location = "" } = {}) {
+export function openLaborImport(form, { location = "", locationCode = "" } = {}) {
   const types = Object.keys(reportTypes);
   const state = {};
   const versions = {};
@@ -63,6 +63,18 @@ export function openLaborImport(form, { location = "" } = {}) {
     set("[data-feedback]", "");
   }
   function section(type) { return dialog.querySelector(`[data-report="${type}"]`); }
+  function matchingLocation(value) {
+    const selected = String(value ?? "").trim().toLowerCase();
+    const destination = dialog.querySelector("[data-location]").value.trim().toLowerCase();
+    return Boolean(selected && (selected === destination || selected === locationCode.trim().toLowerCase()));
+  }
+  function confirmAlias(part) {
+    const selected = part.querySelector("[data-location-value]")?.value;
+    const confirmation = part.querySelector("[data-alias]");
+    if (!confirmation) return;
+    confirmation.closest("label").hidden = !selected || matchingLocation(selected);
+    confirmation.checked = false;
+  }
   function drawLocation(type) {
     const s = state[type], part = section(type);
     if (!s?.rows) return;
@@ -73,8 +85,10 @@ export function openLaborImport(form, { location = "" } = {}) {
       return;
     }
     const unique = Array.from(new Set(s.rows.slice(s.headerIndex + 1).map(row => String(row[locationCol] ?? "").trim()).filter(Boolean))).sort();
-    let match = unique.find(x => x.toLowerCase() === dialog.querySelector("[data-location]").value.trim().toLowerCase());
-    group.innerHTML = `<label>Source location for this review<select data-location-value>${options([["","Choose source location"], ...unique.map(x => [x,x])], match || "")}</select></label>`;
+    const matches = unique.filter(matchingLocation);
+    group.innerHTML = `<label>Source location for this review<select data-location-value>${options([["","Choose source location"], ...unique.map(x => [x,x])], matches.length === 1 ? matches[0] : "")}</select></label>
+      <label class="li-check" hidden><input data-alias type="checkbox"> I checked that this source location name or code identifies the review location.</label>`;
+    confirmAlias(part);
   }
   function drawFields(type) {
     const s = state[type], part = section(type);
@@ -146,10 +160,12 @@ export function openLaborImport(form, { location = "" } = {}) {
       }
       else if (target.matches("[data-header]")) { state[type].headerIndex = Number(target.value); drawFields(type); }
       else if (target.matches('[data-field="location"]')) drawLocation(type);
+      else if (target.matches("[data-location-value]")) confirmAlias(section(type));
     } catch (error) { failFile(type,error); }
   });
   dialog.addEventListener("input", event => {
     if (event.target.matches("[data-location],[data-week]")) invalidate();
+    if (event.target.matches("[data-location]")) for (const type of types) confirmAlias(section(type));
   });
 
   function prepare() {
@@ -166,6 +182,9 @@ export function openLaborImport(form, { location = "" } = {}) {
       if (!s?.rows) throw Error(reportTypes[type].name + ": finish loading and mapping a valid file.");
       const mapping = Object.fromEntries(Array.from(part.querySelectorAll("[data-field]"), select => [select.dataset.field, Number(select.value)]));
       const selectedLocation = part.querySelector("[data-location-value]")?.value, singleLocation = part.querySelector("[data-single]")?.checked;
+      if (selectedLocation && !matchingLocation(selectedLocation) && !part.querySelector("[data-alias]")?.checked) {
+        throw Error(reportTypes[type].name + ": confirm that the source location identifies " + loc + ".");
+      }
       let result;
       try { result = aggregateReport({ type, rows:s.rows, headerIndex:s.headerIndex, mapping, selectedLocation, singleLocation, week, date1904:s.book.date1904 }); }
       catch (error) { throw Error(reportTypes[type].name + ": " + error.message); }

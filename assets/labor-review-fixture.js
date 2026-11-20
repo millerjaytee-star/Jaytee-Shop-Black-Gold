@@ -1,22 +1,11 @@
 /* The fictional browser demo is isolated from authenticated customer records. */
+import {calculateExample as calculate, exampleInputs, exampleWeeks} from './labor-example.js';
+
 const key = 'stabilis-fictional-labor-review-v1';
 export const demoRoles = {OWNER_EXECUTIVE:'Owner',GENERAL_MANAGER:'General manager',STABILIS_ANALYST:'Analyst',READ_ONLY:'Viewer'};
 export const demoManager = {id:'demo-gm',name:'Morgan Ellis'};
-export const base = {forecast_sales:10000,actual_sales:9000,target_pct:25,scheduled_hours:125,actual_hours:135,scheduled_cost:2500,actual_cost:2700};
-export const next = {...base,actual_sales:9500,actual_hours:125,actual_cost:2500};
-const initial = () => ({id:'demo-week-one',status:'released',version:2,week_start:'2026-11-02',inputs:{...base},metrics:calculate(base),source:'Fictional café · sales, schedule and payroll exports',action:{},followup:null,verification:null,history:[{operation:'create',at:'2026-11-09T13:00:00Z'},{operation:'release',at:'2026-11-09T14:00:00Z',note:'Reconciled against the three fictional reports.'}]});
-export function calculate(i){
-  const can=(...keys)=>keys.every(k=>Number.isFinite(i[k]));
-  const pct=can('actual_cost','actual_sales') && i.actual_sales>0 ? i.actual_cost/i.actual_sales*100 : null;
-  return {
-    actual_pct:pct,points_over:pct!==null&&can('target_pct')?pct-i.target_pct:null,
-    hours_over:can('actual_hours','scheduled_hours')?i.actual_hours-i.scheduled_hours:null,
-    schedule_effect:can('scheduled_cost','forecast_sales','target_pct')?i.scheduled_cost-i.forecast_sales*i.target_pct/100:null,
-    sales_effect:can('forecast_sales','actual_sales','target_pct')?(i.forecast_sales-i.actual_sales)*i.target_pct/100:null,
-    payroll_effect:can('actual_cost','scheduled_cost')?i.actual_cost-i.scheduled_cost:null,
-    total_over:can('actual_cost','actual_sales','target_pct')?i.actual_cost-i.actual_sales*i.target_pct/100:null
-  };
-}
+const [base, next] = exampleInputs;
+const initial = () => ({id:'demo-week-one',status:'released',version:2,week_start:exampleWeeks[0].start,inputs:{...base},metrics:calculate(base),source:'Fictional Juniper Café sales, schedule and payroll exports · week of Nov 2, 2026',action:{},followup:null,verification:null,history:[{operation:'create',at:'2026-11-09T13:00:00Z'},{operation:'release',at:'2026-11-09T14:00:00Z',note:'Reconciled against the three fictional reports.'}]});
 function read(){
   let raw;
   try{raw=localStorage.getItem(key)}catch{throw Error('Browser storage is unavailable. Allow local storage to use this fictional workspace.')}
@@ -40,9 +29,18 @@ function allowed(actor,status,operation){
   };
   return valid[operation]===true;
 }
-export function demoAdapter(){
+export function demoAdapter(reviewId){
+  const roleKey=key+'-role';
   let actor='OWNER_EXECUTIVE';
-  return {demo:true,location:'Juniper Café',userId:demoManager.id,get role(){return actor},setRole(v){if(Object.hasOwn(demoRoles,v))actor=v},
+  try{const saved=sessionStorage.getItem(roleKey);if(Object.hasOwn(demoRoles,saved))actor=saved}catch{/* Use the owner role when session storage is unavailable. */}
+  return {demo:true,location:'Juniper Café',userId:demoManager.id,exampleInputs:{base,next},reviewId,
+    url:id=>id?'/labor-review?review='+encodeURIComponent(id):'/labor-review',
+    get role(){return actor},
+    setRole(role){
+      if(!Object.hasOwn(demoRoles,role))return;
+      actor=role;
+      try{sessionStorage.setItem(roleKey,role)}catch{/* The current role still works until reload. */}
+    },
     list:async()=>read().reviews.filter(r=>r.status!=='draft'||actor==='STABILIS_ANALYST'), assignees:async()=>[demoManager],
     async save(id,version,operation,payload){
       const apply=()=>{
@@ -70,8 +68,8 @@ export function demoAdapter(){
           if(!allowed(actor,review.status,operation))throw Error('This role cannot make that change in the current review state.');
           if(operation==='revise'){requireFields(payload,['source']);review.inputs=payload.inputs;review.metrics=calculate(payload.inputs);review.source=payload.source}
           if(operation==='release'){requireFields(payload,['note']);review.status='released'}
-          if(operation==='assign'){requireFields(payload,['title','assignee_id','due_date','next_review']);review.action={...payload};review.status='assigned'}
-          if(operation==='accept')review.status='accepted';
+          if(operation==='assign'){requireFields(payload,['title','assignee_id','due_date','next_review','target_measure','evidence_required']);review.action={...payload,approved_at:new Date().toISOString()};review.status='assigned'}
+          if(operation==='accept'){review.action.accepted_at=new Date().toISOString();review.status='accepted'}
           if(operation==='request_change'){requireFields(payload,['note']);review.action.change_note=payload.note;review.status='change_requested'}
           if(operation==='submit_evidence'){requireFields(payload,['note']);review.action.evidence=payload.note;review.status='evidence_submitted'}
           if(operation==='compare'){

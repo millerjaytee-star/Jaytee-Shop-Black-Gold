@@ -28,7 +28,10 @@ const current=()=>request===renderSequence&&(location.hash||'#command').slice(1)
 try{let C=await context(),w=$('#workspace');if(!current())return;w.innerHTML=views[r](C);
 if(['labor','actions','weekly'].includes(r)){
   const heading=w.querySelector('.page-head');
-  if(heading){const link=document.createElement('a');link.href='#labor-review';link.className='btn sm';link.textContent='Open weekly labor review';heading.append(link)}
+  if(heading){
+    const link=document.createElement('a');link.href='#labor-review';link.className='btn sm';link.textContent='Open weekly labor review';heading.append(link);
+    import('/assets/labor-review.js').then(module=>module.linkLatestLaborReview(link,{rpc,orgId:selection.org,locationId:selection.loc})).catch(()=>{});
+  }
 }
 w.dataset.moduleRoute=r;lastRoute=r;wire(r);window.scrollTo(0,0)}catch(e){let w=$('#workspace');if(current()&&w)w.innerHTML=head('Stabilis','Module unavailable','The underlying operating data remains protected.')+empty(e.message||'Unable to load authorized module data.')}}
 let w=$('#workspace');if(w)new MutationObserver(()=>{let r=(location.hash||'#command').slice(1);if(managed.has(r)&&w.dataset.moduleRoute!==r)setTimeout(()=>render(),20)}).observe(w,{childList:true});window.addEventListener('hashchange',()=>{lastRoute='';setTimeout(()=>render(),40)});$('#orgSelect')?.addEventListener('change',()=>{lastRoute='';setTimeout(()=>render(true),80)});$('#locationSelect')?.addEventListener('change',()=>{lastRoute='';setTimeout(()=>render(true),80)});setTimeout(()=>render(),600)})();

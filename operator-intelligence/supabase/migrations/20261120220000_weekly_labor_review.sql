@@ -154,7 +154,9 @@ end $$;
 create function public.stabilis_labor_assignees(p_organization_id uuid,p_location_id uuid)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 begin
-  perform stabilis.labor_scope_role(p_organization_id,p_location_id);
+  if stabilis.labor_scope_role(p_organization_id,p_location_id) not in ('OWNER_EXECUTIVE','AREA_MANAGER') then
+    raise exception 'Leader access required' using errcode='42501';
+  end if;
   return (select coalesce(jsonb_agg(jsonb_build_object('id',a.profile_id,'name',a.display_name) order by a.display_name),'[]'::jsonb)
     from stabilis.labor_review_assignees a join stabilis.memberships m
       on m.organization_id=a.organization_id and m.profile_id=a.profile_id and m.status='ACTIVE' and m.role::text='GENERAL_MANAGER'
@@ -217,11 +219,23 @@ begin
     prior := to_jsonb(w)-'history';
     gm := role_name='GENERAL_MANAGER' and auth.uid()::text=w.action->>'assignee_id';
     case p_operation
-    when 'revise' then
-      if not reviewer or w.status<>'draft' then raise exception 'Revisions require an analyst-owned draft'; end if;
+    when 'revise', 'correct' then
+      if not reviewer or ((p_operation='revise')<>(w.status='draft')) then
+        raise exception 'Analyst access and matching review status required for corrections';
+      end if;
+      if p_payload ? 'week_start' and stabilis.labor_date(p_payload,'week_start')<>w.week_start then
+        raise exception 'Corrected exports must match the original fiscal week';
+      end if;
       w.inputs := jsonb_strip_nulls(p_payload->'inputs');
       w.metrics := stabilis.labor_metrics(w.inputs);
       w.source := stabilis.labor_required_text(p_payload,'source');
+      if p_operation='correct' then
+        note := stabilis.labor_required_text(p_payload,'note');
+        w.status := 'draft';
+        w.action := null;
+        w.followup := null;
+        w.verification := null;
+      end if;
     when 'release' then
       if not reviewer or w.status<>'draft' then raise exception 'A draft and analyst approval are required'; end if;
       note := stabilis.labor_required_text(p_payload,'note');
@@ -238,7 +252,9 @@ begin
       next_review := stabilis.labor_date(p_payload,'next_review');
       if due < w.week_start or next_review < due then raise exception 'Check the due and next-review dates'; end if;
       w.action := jsonb_build_object('title',stabilis.labor_required_text(p_payload,'title'),'assignee_id',assignee,
-        'assignee_name',member_name,'due_date',due,'next_review',next_review,'approved_by',auth.uid());
+        'assignee_name',member_name,'due_date',due,'next_review',next_review,'approved_by',auth.uid(),
+        'approved_at',now(),'target_measure',stabilis.labor_required_text(p_payload,'target_measure'),
+        'evidence_required',stabilis.labor_required_text(p_payload,'evidence_required'));
       w.status := 'assigned';
     when 'accept' then
       if gm is not true or w.status<>'assigned' then raise exception 'Assigned GM and outstanding assignment required'; end if;
@@ -252,8 +268,15 @@ begin
     when 'submit_evidence' then
       if gm is not true or w.status<>'accepted' then raise exception 'Assigned GM and accepted action required'; end if;
       note := stabilis.labor_required_text(p_payload,'note');
-      w.action := w.action || jsonb_build_object('evidence',note,'evidence_at',now(),'evidence_by',auth.uid());
+      w.action := (w.action-'clarification') || jsonb_build_object('evidence',note,'evidence_at',now(),'evidence_by',auth.uid());
       w.status := 'evidence_submitted';
+    when 'clarify' then
+      if not (reviewer or leader) or w.status<>'evidence_submitted' then
+        raise exception 'Submitted evidence and reviewer or leader access required';
+      end if;
+      note := stabilis.labor_required_text(p_payload,'note');
+      w.action := (w.action-'evidence'-'evidence_at'-'evidence_by') || jsonb_build_object('clarification',note);
+      w.status := 'accepted';
     when 'compare' then
       if not (reviewer or leader) or w.status not in ('evidence_submitted','compared') then raise exception 'Evidence and reviewer or leader access required'; end if;
       period_start := stabilis.labor_closed_week(p_payload,p_location_id);
@@ -266,7 +289,7 @@ begin
         observed := (w.metrics->>'total_over')::numeric-(m->>'total_over')::numeric;
       end if;
       w.followup := jsonb_build_object('week_start',period_start,'inputs',normalized,'metrics',m,'source',stabilis.labor_required_text(p_payload,'source'),
-        'comparable',p_payload->'comparable','note',note,'observed_change',observed,'reviewed_by',auth.uid());
+        'comparable',p_payload->'comparable','note',note,'observed_change',observed,'reviewed_by',auth.uid(),'reviewed_at',now());
       w.status := 'compared';
     when 'reopen' then
       if not (reviewer or leader) or w.status not in ('evidence_submitted','compared','verified') then raise exception 'Submitted evidence and reviewer or leader access required'; end if;

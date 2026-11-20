@@ -16,9 +16,17 @@
     <nav aria-label="Demo navigation"><a href="/operator-intelligence-report">Sample report</a><a class="lr-nav-sign" href="/login?view=labor-review">Client sign in <span aria-hidden="true">→</span></a></nav>
   </header>
   <main id="review" class="lr-wrap" tabindex="-1">
-    <div class="lr-intro"><p>Stabilis Operator Intelligence™</p><h1>Weekly labor review</h1><div>Try the owner, manager and analyst roles with fictional café records. This demo saves changes in this browser.</div></div>
+    <div class="lr-intro"><p>Stabilis Operator Intelligence™</p><h1>Weekly labor review</h1><div>See why Juniper Café missed its labor plan, assign an action and review the following week. Try the owner, GM and analyst roles with fictional records. Changes stay in this browser.</div></div>
     <div id="labor-demo"><noscript>Enable JavaScript to try the review. You can also <a href="/operator-intelligence-report">read the sample report</a>.</noscript></div>
+    <section id="labor-scenarios" class="lr-root lr-wide lr-no-print" hidden aria-labelledby="scenario-title">
+      <h2 id="scenario-title">Compare other labor patterns</h2>
+      <p class="lr-sub">Try another fictional set of figures without changing your Juniper Café review.</p>
+      <div class="lr-downloads"><a href="/assets/labor-review-example.csv" download>Download the baseline CSV</a><a href="/assets/labor-examples/following-week.csv" download>Download the following-week CSV</a></div>
+      <label class="lr-field">Fictional scenario <select id="labor-scenario"><option value="">Choose a scenario</option></select></label>
+      <p id="scenario-update" class="lr-sr-only" role="status"></p>
+      <div id="scenario-output"></div>
+    </section>
   </main>
-  <footer class="lr-footer"><a href="/">Stabilis Ops Group</a><a href="/#diagnostic">Request a 20-minute fit call <span aria-hidden="true">→</span></a></footer>
+  <footer class="lr-footer"><a href="/">Stabilis Ops Group</a><a href="/operator-intelligence-report">Sample report</a><a href="/#diagnostic">Request a 20-minute fit call <span aria-hidden="true">→</span></a></footer>
 </body>
 </html>

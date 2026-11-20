@@ -8,12 +8,13 @@ import argparse
 from fnmatch import fnmatchcase
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from io import BytesIO
 from pathlib import Path
 import tomllib
 from urllib.parse import urlsplit, urlunsplit
 
+from build_site import PREVIEW_BROWSER_CONFIG, ROOT, is_public_path
 
-ROOT = Path(__file__).resolve().parents[2]
 CONFIG = tomllib.loads((ROOT / "netlify.toml").read_text())
 
 
@@ -36,6 +37,13 @@ class PreviewHandler(SimpleHTTPRequestHandler):
     def send_head(self):
         requested = urlsplit(self.path)
         self.requested_path = requested.path
+        if requested.path == "/stabilis-config.js":
+            content = PREVIEW_BROWSER_CONFIG.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            return BytesIO(content)
         target, status = ROUTES.get(requested.path, (requested.path, 200))
         if status in (301, 302, 307, 308):
             self.send_response(status)
@@ -46,9 +54,13 @@ class PreviewHandler(SimpleHTTPRequestHandler):
         self.path = target
         resolved = Path(self.translate_path(target)).resolve()
         if resolved == ROOT:
-            self.path = "/index.html"
+            resolved = ROOT / "index.html"
         elif resolved.suffix == "" and resolved.with_suffix(".html").is_file():
-            self.path = target + ".html"
+            resolved = resolved.with_suffix(".html")
+        if not resolved.is_relative_to(ROOT) or not is_public_path(resolved) or not resolved.is_file():
+            self.send_error(404)
+            return None
+        self.path = "/" + resolved.relative_to(ROOT).as_posix()
         return super().send_head()
 
     def end_headers(self):

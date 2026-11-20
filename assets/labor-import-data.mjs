@@ -1,7 +1,7 @@
 /** Map daily, deidentified reports to one seven-day location review. No storage or network access. */
 export const reportTypes = {
   sales: { name: "Sales", fields: ["actual_sales", "forecast_sales"] },
-  schedule: { name: "Approved schedule", fields: ["scheduled_hours", "scheduled_cost"] },
+  schedule: { name: "Schedule", fields: ["scheduled_hours", "scheduled_cost"] },
   payroll: { name: "Paid labor", fields: ["actual_hours", "actual_cost"] },
 };
 export const fieldNames = {

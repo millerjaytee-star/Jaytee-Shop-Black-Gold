@@ -83,6 +83,8 @@ def test_sample_report_preserves_estimated_vs_verified_distinction():
     report=text('operator-intelligence-report.html')
     assert 'FICTIONAL DEMO DATA' in report
     assert '$392,570.56' in report
-    assert 'Verified Value = $0' in report
+    assert 'Modeled opportunity' in report
+    assert 'Observed change' in report
+    assert 'Client-verified financial impact (Verified Value)</b> is $0' in report
     assert 'HHR-07 overtime is supporting evidence' in report
     assert '$0 additional rollup' in report

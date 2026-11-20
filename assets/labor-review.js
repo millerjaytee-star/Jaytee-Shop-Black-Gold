@@ -1,11 +1,11 @@
 const labels = {
   forecast_sales:'Forecast net sales ($)', actual_sales:'Actual net sales ($)', target_pct:'Labor target (%)',
-  scheduled_hours:'Approved scheduled hours',actual_hours:'Actual paid hours',
-  scheduled_cost:'Approved scheduled labor ($)',actual_cost:'Actual paid labor ($)'
+  scheduled_hours:'Scheduled hours',actual_hours:'Actual paid hours',
+  scheduled_cost:'Scheduled labor ($)',actual_cost:'Actual paid labor ($)'
 };
 const statusNames={draft:'Analyst review',released:'Ready to assign',assigned:'Awaiting GM acceptance',accepted:'Action in progress',change_requested:'Change requested',evidence_submitted:'Evidence submitted',compared:'Following week reviewed',verified:'Finance validated'};
 const roleNames={STABILIS_ADMIN:'Stabilis admin',STABILIS_ANALYST:'Analyst',OWNER_EXECUTIVE:'Owner',GENERAL_MANAGER:'General manager',AREA_MANAGER:'Area manager',READ_ONLY:'Viewer'};
-const historyNames={create:'Baseline saved',revise:'Baseline corrected',release:'Analyst released finding',assign:'Action assigned',accept:'GM accepted action',request_change:'GM requested a change',submit_evidence:'GM submitted evidence',compare:'Following week compared',reopen:'Action reopened',verify:'Finance validation recorded'};
+const historyNames={create:'Baseline saved',revise:'Baseline corrected',correct:'Correction returned to analyst review',release:'Analyst released finding',assign:'Action assigned',accept:'GM accepted action',request_change:'GM requested a change',submit_evidence:'GM submitted evidence',clarify:'Evidence clarification requested',compare:'Evidence accepted and following week compared',reopen:'Action reopened',verify:'Finance validation recorded'};
 const currency=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:2});
 const number=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});
 const human=(v,fmt=number,suffix='')=>typeof v==='number'&&Number.isFinite(v)?fmt.format(v)+suffix:'Needs data';
@@ -18,44 +18,67 @@ function field(name,label,value='',type='text',attrs='required'){return `<label 
 function note(name,label,value=''){return `<label class="lr-field">${safe(label)}<textarea name="${name}" rows="2" maxlength="1000" required>${safe(value)}</textarea></label>`}
 function form(op,html,button){return `<form data-op="${op}">${html}<div class="lr-actions"><button class="lr-primary" type="submit">${safe(button)}</button></div></form>`}
 function lines(items){return '<dl class="lr-lines">'+items.filter(([,v])=>v!=null&&v!=='').map(([n,v])=>`<div><dt>${safe(n)}</dt><dd>${safe(v)}</dd></div>`).join('')+'</dl>'}
-const demoNext={forecast_sales:10000,actual_sales:9500,target_pct:25,scheduled_hours:125,actual_hours:125,scheduled_cost:2500,actual_cost:2500};
-const demoBaseline={forecast_sales:10000,actual_sales:9000,target_pct:25,scheduled_hours:125,actual_hours:135,scheduled_cost:2500,actual_cost:2700};
 function inputsForm(values={}){
   return '<div class="lr-formgrid">'+Object.entries(labels).map(([key,title])=>field(key,title,values[key]??'','number',`step="any" min="0" ${key==='target_pct'?'max="100"':''}`)).join('')+'</div>';
 }
 function csvImport(){return '<button type="button" data-reconcile>Import sales, schedules and payroll</button><details class="lr-no-print"><summary>Fill from an aggregate CSV</summary><p class="lr-help">Use one location and one fiscal week per file. Select your export, inspect the populated fields and confirm below. Missing columns stay empty.</p><a href="/assets/labor-review-example.csv" download>Download the fictional CSV template</a><label class="lr-field">Weekly aggregate CSV<input type="file" data-csv accept=".csv,text/csv"></label><div data-import-status role="status" class="lr-help"></div></details>'}
-function baselineEditor(demo,review){
+function baselineEditor(adapter,review){
   const editing=Boolean(review);
-  const html=field('week_start','Fiscal week starting',review?.week_start??'','date',editing?'required readonly':'required')+csvImport()+inputsForm(review?.inputs??(demo?demoBaseline:{}))+note('source','Source report references',review?.source??(demo?'Fictional sales, schedule and payroll exports':''))+ '<p class="lr-help">Leave unavailable values empty. Confirm the location, week and field definitions before saving.</p>';
+  const correcting=editing&&review.status!=='draft';
+  const html=field('week_start','Fiscal week starting',review?.week_start??'','date',editing?'required readonly':'required')+csvImport()+inputsForm(review?.inputs??adapter.exampleInputs?.base)+note('source','Source report references',review?.source??(adapter.demo?'Fictional sales, approved schedule and payroll exports':''))+ '<p class="lr-help">Leave unavailable values empty. Confirm the location, week and field definitions before saving. Record the schedule’s approval reference when available.</p>';
+  if(correcting)return form('correct','<p class="lr-help">This saves the previous record in the audit trail and returns the finding to analyst review. Any action, comparison or finance validation requires a new decision after release.</p>'+html+note('note','Reason for correction'),'Save correction and return to review');
   return form(editing?'revise':'create',html,editing?'Save corrected baseline':'Confirm and save baseline');
 }
-function comparisonEditor(r,demo){
-  return form('compare',field('week_start','Following week starting',addDays(r.week_start,7),'date',`required min="${addDays(r.week_start,1)}"`)+csvImport()+inputsForm(demo?demoNext:{})+note('source','Following week source references',demo?'Fictional following-week payroll and sales exports':'')+`<label class="lr-field">Period comparability<select name="comparable" required><option value="">Choose after checking the records</option><option value="yes">Comparable after review</option><option value="no">Not comparable</option></select></label>`+note('note','Sales, hours, holidays or rate adjustments',demo?'Same operating hours and wage rates across both fictional weeks.':'') ,'Save weekly comparison');
+function comparisonEditor(r,adapter){
+  const demo=adapter.demo;
+  const prior=r.followup;
+  const earliest=addDays(r.week_start,7);
+  return form('compare',field('week_start','Following week starting',prior?.week_start||earliest,'date',`required min="${earliest}"`)+csvImport()+inputsForm(prior?.inputs??adapter.exampleInputs?.next)+note('source','Following week source references',prior?.source??(demo?'Fictional Juniper Café sales, schedule and payroll exports':''))+`<label class="lr-field">Period comparability<select name="comparable" required><option value="">Choose after checking the records</option><option value="yes" ${prior?.comparable===true?'selected':''}>Comparable after review</option><option value="no" ${prior?.comparable===false?'selected':''}>Not comparable</option></select></label>`+note('note','Sales, hours, holidays or rate adjustments',prior?.note??(demo?'Same operating hours and wage rates across both fictional weeks.':'')),prior?'Save corrected comparison':'Accept evidence and save comparison');
 }
 function permission(role){return {analyst:['STABILIS_ANALYST','STABILIS_ADMIN'].includes(role),owner:['OWNER_EXECUTIVE','AREA_MANAGER'].includes(role),gm:role==='GENERAL_MANAGER',finance:role==='OWNER_EXECUTIVE'}}
 function section(title,body){return `<section class="lr-card"><h2>${safe(title)}</h2>${body}</section>`}
-function breakdown(r){
-  const m=r.metrics||{}, parts=[['Schedule against forecast budget',m.schedule_effect,'scheduled cost − forecast sales × target',''],['Sales miss against forecast',m.sales_effect,'(forecast sales − actual sales) × target',''],['Payroll against schedule',m.payroll_effect,'paid labor cost − scheduled labor cost','lr-hours']];
+export function breakdown(r){
+  const m=r.metrics||{}, input=r.inputs||{};
+  const scheduled=money(input.scheduled_cost), paid=money(input.actual_cost);
+  const forecast=money(input.forecast_sales), sales=money(input.actual_sales), target=human(input.target_pct,number,'%');
+  const formula=(value, expression)=>Number.isFinite(value)?`${expression} = ${money(value)}`:'Needs data';
+  const parts=[
+    ['Schedule against forecast budget',m.schedule_effect,formula(m.schedule_effect,`${scheduled} − (${target} × ${forecast})`),''],
+    ['Sales effect against forecast',m.sales_effect,formula(m.sales_effect,`${target} × (${forecast} − ${sales})`),''],
+    ['Payroll against schedule',m.payroll_effect,formula(m.payroll_effect,`${paid} − ${scheduled}`),'lr-hours']
+  ];
   const magnitude=parts.reduce((sum,[,v])=>sum+Math.abs(v||0),0);
   const rows=parts.map(([name,val,,cls])=>`<li><div class="lr-row"><span>${safe(name)}</span><strong>${money(val)}</strong></div><div class="lr-track" aria-hidden="true"><span class="lr-fill ${cls}" style="width:${magnitude?Math.round(Math.abs(val||0)/magnitude*100):0}%"></span></div></li>`).join('');
   const missing=Object.keys(labels).filter(k=>r.inputs?.[k]==null);
-  const input=r.inputs||{}, findings=[];
+  const findings=[];
   if(Number.isFinite(input.forecast_sales)&&Number.isFinite(input.actual_sales)){
     const salesGap=input.actual_sales-input.forecast_sales;
     findings.push(salesGap===0?'Sales matched forecast.':'Sales finished '+money(Math.abs(salesGap))+(salesGap<0?' below':' above')+' forecast.');
   }
   if(Number.isFinite(m.hours_over))findings.push(m.hours_over===0?'Paid hours matched the schedule.':'The team worked '+human(Math.abs(m.hours_over))+(m.hours_over>0?' more':' fewer')+' hours than scheduled.');
   const summary=findings.length?'<p>'+safe(findings.join(' '))+'</p>':'';
-  return `<section class="lr-card"><div class="lr-resulthead"><div><p class="lr-kicker">Labor variance</p><div class="lr-big">${money(m.total_over==null?null:Math.abs(m.total_over))}</div><div>${signed(m.total_over)} at actual sales</div></div><div class="lr-status">Historical variance</div></div>${summary}<ul class="lr-break">${rows}</ul><dl class="lr-facts"><div><dt>Actual labor</dt><dd>${human(m.actual_pct,number,'%')}</dd></div><div><dt>Vs. target</dt><dd>${human(m.points_over,number,' pp')}</dd></div><div><dt>Hours vs. schedule</dt><dd>${human(m.hours_over,number,' h')}</dd></div></dl>
+  const zeroSales=input.actual_sales===0?'<p class="lr-help">Net sales are $0. A labor percentage is undefined. The dollar comparisons still use recorded labor and sales.</p>':'';
+  const missingForecast=input.forecast_sales==null?'<p class="lr-help">Add the sales forecast for this location and fiscal week to separate the sales effect from the schedule budget.</p>':'';
+  const actualRate=input.actual_sales===0?'Unavailable':human(m.actual_pct,number,'%');
+  const equations=lines([
+    ...parts.map(([label,,expression])=>[label,expression]),
+    ['Total over target at actual sales',formula(m.total_over,`${paid} − (${target} × ${sales})`)]
+  ]);
+  const sources=lines([
+    ['Forecast net sales',forecast], ['Actual net sales',sales], ['Labor target',target],
+    ['Scheduled labor',`${human(input.scheduled_hours,number,' h')} · ${scheduled}`],
+    ['Paid labor',`${human(input.actual_hours,number,' h')} · ${paid}`]
+  ]);
+  return `<section class="lr-card"><div class="lr-resulthead"><div><h2 class="lr-kicker">Labor variance</h2><div class="lr-big">${money(m.total_over==null?null:Math.abs(m.total_over))}</div><div>${signed(m.total_over)} at actual sales</div></div><div class="lr-status">Historical variance</div></div>${summary}<ul class="lr-break">${rows}</ul><dl class="lr-facts"><div><dt>Actual labor</dt><dd>${actualRate}</dd></div><div><dt>Vs. target</dt><dd>${input.actual_sales===0?'Unavailable':human(m.points_over,number,' pp')}</dd></div><div><dt>Hours vs. schedule</dt><dd>${human(m.hours_over,number,' h')}</dd></div></dl>
     <p class="lr-print-only">Baseline source: ${safe(r.source||'Source reference unavailable')}.</p>
-    <details><summary>Show the math and source records</summary><p class="lr-help">Positive values are unfavorable. Formula terms use the labor target as a fraction.</p>${lines(parts.map(([t,,f])=>[t,f]))}${lines(Object.entries(labels).map(([k,v])=>[v,human(r.inputs?.[k])]))}<p class="lr-help">Source: ${safe(r.source||'Source reference unavailable')}.</p></details>
+    <details><summary>Show the math and source records</summary><p class="lr-help">A positive dollar difference adds to the overage. A negative difference offsets it.</p>${equations}${sources}<p class="lr-help">Source: ${safe(r.source||'Source reference unavailable')}.</p></details>
     ${missing.length?`<p class="lr-help"><strong>Missing inputs:</strong> ${missing.map(k=>safe(labels[k])).join(', ')}. Related components stay open for investigation.</p>`:''}
-    <p class="lr-help">The records explain the cost differences. A manager must confirm what happened on the shift.</p></section>`;
+    ${zeroSales}${missingForecast}<p class="lr-help">Confirm possible causes against shift evidence. Extra paid hours alone do not identify the shift or the reason.</p></section>`;
 }
 function actionInfo(r){
   const a=r.action;
   if(!a?.title)return '';
-  return `<p><strong>${safe(a.title)}</strong></p>${lines([['Assigned to',a.assignee_name],['Due',prettyDate(a.due_date)],['Next review',prettyDate(a.next_review)],['Change requested',a.change_note||((r.status==='change_requested')?(r.history||[]).filter(e=>e.operation==='request_change').at(-1)?.note:null)],['Completion evidence',typeof a.evidence==='object'?a.evidence?.note:a.evidence]])}`;
+  return `<p><strong>${safe(a.title)}</strong></p>${lines([['Assigned to',a.assignee_name],['Target measure',a.target_measure],['Evidence to submit',a.evidence_required],['Due',prettyDate(a.due_date)],['Next review',prettyDate(a.next_review)],['GM accepted',a.accepted_at&&prettyDate(a.accepted_at)],['Change requested',a.change_note||((r.status==='change_requested')?(r.history||[]).filter(e=>e.operation==='request_change').at(-1)?.note:null)],['Clarification requested',a.clarification],['Completion evidence',typeof a.evidence==='object'?a.evidence?.note:a.evidence]])}`;
 }
 function actionForm(r,adapter,assignees){
   const s=r.status, p=permission(adapter.role), demo=adapter.demo;
@@ -66,14 +89,18 @@ function actionForm(r,adapter,assignees){
     if(!p.owner)return switchHint('OWNER_EXECUTIVE','The owner or area manager approves the action and assigns a GM.');
     if(!assignees.length)return '<p class="lr-sub">No enrolled GM is available for this location. An assigned GM can open this review, enter their display name and join the roster.</p>';
     const opts=assignees.map(a=>`<option value="${safe(a.id)}">${safe(a.name)}</option>`).join('');
-    return form('assign',field('title','Corrective action',r.action?.title||(demo?'Check closing coverage against the approved schedule':''))+`<label class="lr-field">Responsible manager<select required name="assignee_id">${opts}</select></label>`+'<div class="lr-formgrid">'+field('due_date','Due date',r.action?.due_date||addDays(r.week_start,10),'date')+field('next_review','Next review',r.action?.next_review||addDays(r.week_start,14),'date')+'</div>','Approve and assign');
+    return form('assign',field('title','Corrective action',r.action?.title||(demo?'Check closing coverage against the approved schedule':''))+`<label class="lr-field">Responsible manager<select required name="assignee_id">${opts}</select></label>`+note('target_measure','Target measure',r.action?.target_measure||(demo?'Keep paid hours within the 125-hour schedule.':''))+note('evidence_required','Evidence to submit',r.action?.evidence_required||(demo?'Record the scheduled and paid closing hours for each day.':''))+'<div class="lr-formgrid">'+field('due_date','Due date',r.action?.due_date||addDays(r.week_start,10),'date')+field('next_review','Next review',r.action?.next_review||addDays(r.week_start,14),'date')+'</div>','Approve and assign');
   }
   if(s==='assigned'){
     if(!mine)return switchHint('GENERAL_MANAGER','The assigned GM can accept the action or ask the owner for a change.');
-    return form('accept','','Accept action')+'<details><summary>Request a change</summary>'+form('request_change',note('note','Requested change'),'Send change request')+'</details>';
+    return form('accept','<p class="lr-help">Accept to confirm the due date and next review listed above.</p>','Accept action')+'<details><summary>Request a change</summary>'+form('request_change',note('note','Requested change'),'Send change request')+'</details>';
   }
   if(s==='accepted')return mine?form('submit_evidence',note('note','Completion evidence',demo?'Closing coverage checked against the approved schedule for all seven days.':''),'Submit evidence'):switchHint('GENERAL_MANAGER','The assigned GM records what the team did and the evidence behind it.');
-  if(s==='evidence_submitted')return p.owner||p.analyst?comparisonEditor(r,demo):switchHint('OWNER_EXECUTIVE','The owner or analyst compares the following week with the baseline.');
+  if(s==='evidence_submitted'){
+    if(!p.owner&&!p.analyst)return switchHint('OWNER_EXECUTIVE','The owner or analyst reviews the evidence and compares the following week with the baseline.');
+    const clarify='<details class="lr-no-print"><summary>Ask the GM for clarification</summary>'+form('clarify',note('note','What does the GM need to clarify?'),'Request clarification')+'</details>';
+    return comparisonEditor(r,adapter)+(demo?'':clarify);
+  }
   if(s==='compared'){
     const change=r.followup?.observed_change;
     if(!r.followup?.comparable||!(change>0))return '<p class="lr-sub">The comparison does not support positive financial verification.</p>';
@@ -84,7 +111,22 @@ function actionForm(r,adapter,assignees){
 }
 function result(r,demo){
   const f=r.followup;
-  return section('Results',lines([['Modeled opportunity','No approved estimate'],['Baseline variance',money(r.metrics?.total_over)],['Following week variance',f?money(f.metrics?.total_over):'Awaiting next week'],['Observed change',!f?'Awaiting next week':f.comparable?money(f.observed_change):'Periods not comparable'],['Client-verified financial impact',r.verification?money(r.verification.amount):demo?'$0 · No finance validation':'No finance validation']])+(f?`<p class="lr-help">Week of ${prettyDate(f.week_start)} · ${safe(f.source||'Source unavailable')}. ${safe(f.note)}</p>`:'' )+(r.verification?`<p class="lr-help">Finance approval: ${safe(r.verification.finance_reference)}.</p>`:'<p class="lr-help">The Proof Ledger requires separate finance validation.</p>'));
+  let outcome='';
+  let comparison='';
+  if(f){
+    const change=f.observed_change;
+    if(!f.comparable)outcome='The periods are incomparable. The differences below describe the records for each week.';
+    else if(!Number.isFinite(change))outcome='The action has submitted evidence. A measured change needs labor cost, net sales and the labor target for both weeks.';
+    else if(change>0)outcome=`Labor variance improved by ${money(change)}.`;
+    else if(change<0)outcome=`Labor variance worsened by ${money(-change)} even though the action has submitted evidence.`;
+    else outcome='Labor variance stayed flat after the action.';
+    const detail=Object.entries(labels).map(([key,label])=>{
+      const format=key.endsWith('_sales')||key.endsWith('_cost')?currency:number;
+      return [label,`${human(r.inputs?.[key],format)} → ${human(f.inputs?.[key],format)}`];
+    });
+    comparison=`<p class="lr-help">Week of ${prettyDate(f.week_start)} · ${safe(f.source||'Source unavailable')}. ${safe(f.note||'')}</p><details><summary>Compare planned and actual figures</summary><p class="lr-help">Figures read from baseline to following week.</p>${lines(detail)}</details>`;
+  }
+  return section('Results',lines([['Modeled opportunity','No approved estimate'],['Baseline variance',money(r.metrics?.total_over)],['Following week variance',f?money(f.metrics?.total_over):'Awaiting next week'],['Observed change',!f?'Awaiting next week':f.comparable?money(f.observed_change):'Periods not comparable'],['Client-verified financial impact',r.verification?money(r.verification.amount):demo?'$0 · No finance validation':'No finance validation']])+(outcome?`<p>${safe(outcome)}</p>`:'')+comparison+(r.verification?`<p class="lr-help">Finance approval: ${safe(r.verification.finance_reference)}.</p>`:'<p class="lr-help">The Proof Ledger requires separate finance validation.</p>'));
 }
 function history(r){return '<details><summary>Review history</summary><ol class="lr-activity">'+(r.history||[]).map(e=>`<li>${safe(historyNames[e.operation]||e.operation||e.event||e.status||'Review updated')} · ${prettyDate(e.at||e.created_at||e.timestamp)}${e.note?`<br>${safe(e.note)}`:''}</li>`).join('')+'</ol></details>'}
 function readInputs(fd){
@@ -113,35 +155,52 @@ export function parseWeeklyCSV(input){
   return data;
 }
 export async function mountLaborReview(root,adapter){
-  let reviews=[],assignees=[],currentId='',creating=false,busy=false,message='',isError=false;
+  let reviews=[],assignees=[],currentId=adapter.reviewId||'',creating=false,busy=false,message='',isError=false;
   root.classList.add('lr-root');
   root.innerHTML='<p role="status">Loading the weekly labor review…</p>';
-  const active=()=>reviews.find(r=>r.id===currentId)||reviews[0];
+  const active=()=>currentId?reviews.find(r=>r.id===currentId):reviews[0];
+  function selectReview(id){
+    currentId=id;
+    if(adapter.url&&root.isConnected)window.history.replaceState(null,'',adapter.url(id));
+  }
   function render(){
     if(!root.isConnected)return;
     const r=active(), demo=adapter.demo, p=permission(adapter.role);
     const picker=demo?`<label>Demo role <select name="demo-role">${Object.entries(roleNames).filter(([k])=>['STABILIS_ANALYST','OWNER_EXECUTIVE','GENERAL_MANAGER','READ_ONLY'].includes(k)).map(([k,v])=>`<option value="${k}" ${adapter.role===k?'selected':''}>${v}</option>`).join('')}</select></label>`:`<span class="lr-status">${safe(roleNames[adapter.role]||adapter.role)}</span>`;
-    const weeks=reviews.length?`<label>Review <select name="review-id">${reviews.map(v=>`<option value="${safe(v.id)}" ${r?.id===v.id?'selected':''}>${prettyDate(v.week_start)}</option>`).join('')}</select></label>`:'';
-    const tools=`<div class="lr-tools"><div class="lr-view">${picker}${weeks}</div><div class="lr-actions">${p.analyst?`<button type="button" data-new>${creating?'Cancel new review':'New weekly review'}</button>`:''}${r?'<button type="button" data-print>Print weekly review</button>':''}<button type="button" data-refresh>Refresh</button></div></div>`;
+    const weeks=reviews.length?`<label>Review <select name="review-id">${!r?'<option value="" disabled selected>Select a review</option>':''}${reviews.map(v=>`<option value="${safe(v.id)}" ${r?.id===v.id?'selected':''}>${prettyDate(v.week_start)} · ${safe(statusNames[v.status]||v.status)}</option>`).join('')}</select></label>`:'';
+    const link=r&&adapter.url?`<a href="${safe(adapter.url(r.id))}">Link to this review</a>`:'';
+    const tools=`<div class="lr-tools"><div class="lr-view">${picker}${weeks}</div><div class="lr-actions">${p.analyst?`<button type="button" data-new>${creating?'Cancel new review':'New weekly review'}</button>`:''}${r&&!creating?'<button type="button" data-print>Print weekly review</button>':''}${link}<button type="button" data-refresh>Refresh</button></div></div>`;
     let detail='';
-    if(creating&&p.analyst)detail='<section class="lr-wide"><h2>New weekly review</h2>'+baselineEditor(demo)+'</section>';
+    if(creating&&p.analyst)detail='<section class="lr-wide"><h2>New weekly review</h2>'+baselineEditor(adapter)+'</section>';
     if(r&&!creating){
-      const extra=p.analyst&&r.status==='draft'?'<details><summary>Correct the draft baseline</summary>'+baselineEditor(demo,r)+'</details>':'';
+      const extra=p.analyst&&(r.status==='draft'||!demo)?'<details class="lr-no-print"><summary>'+(r.status==='draft'?'Correct the draft baseline':'Correct the released baseline')+'</summary>'+baselineEditor(adapter,r)+'</details>':'';
       const due = r.action?.due_date && ['assigned','accepted','change_requested'].includes(r.status) && r.action.due_date < new Date().toISOString().slice(0,10);
       const overdue=due?'<p class="lr-overdue">Action overdue · due '+prettyDate(r.action.due_date)+'</p>':'';
       const reopen=(p.owner||p.analyst)&&['compared','evidence_submitted','verified'].includes(r.status)?'<details class="lr-no-print"><summary>Reopen action</summary>'+form('reopen',note('note','Reason for reopening'),'Reopen action')+'</details>':'';
+      const editComparison=!demo&&(p.owner||p.analyst)&&r.status==='compared'?'<details class="lr-no-print"><summary>Correct the comparison</summary>'+comparisonEditor(r,adapter)+'</details>':'';
+      const pending=r.action?.title?'':'<p class="lr-print-only">Action, owner and due date await approval.</p>';
+      const action=`<div class="lr-stack">${section('Action and follow-through',actionInfo(r)+pending+overdue+actionForm(r,adapter,assignees)+editComparison+reopen+extra+history(r))}</div>`;
+      const analysis=`<div class="lr-stack">${breakdown(r)}${result(r,demo)}</div>`;
+      const actionFirst=p.gm&&r.action?.assignee_id===adapter.userId;
       detail=`<div class="lr-sectionhead lr-title"><div><p class="lr-kicker">${safe(adapter.location)}${demo?' · Fictional location':''}</p><h2 style="margin:0">Week of ${prettyDate(r.week_start)}</h2></div><span class="lr-status">${safe(statusNames[r.status]||r.status)}</span></div>
-       <div class="lr-grid"><div class="lr-stack">${breakdown(r)}${result(r,demo)}</div><div class="lr-stack">${section('Action and follow-through',actionInfo(r)+overdue+actionForm(r,adapter,assignees)+reopen+extra+history(r))}</div></div>`;
-    }else if(!r&&!creating)detail=section('No weekly review available',p.analyst?'<p>Create the first review from a closed fiscal week.</p>':'<p>Released findings for this location will appear here after analyst review.</p>');
+       <div class="lr-grid">${actionFirst?action+analysis:analysis+action}</div>`;
+    }else if(!r&&!creating)detail=currentId?section('Review unavailable','<p>Check this link with your team or choose an available review.</p>'):section('No weekly review available',p.analyst?'<p>Create the first review from a closed fiscal week.</p>':'<p>Released findings for this location will appear here after analyst review.</p>');
     const enroll=!demo&&p.gm&&adapter.enroll?'<details class="lr-no-print"><summary>Join this location’s GM roster</summary>'+form('enroll',field('name','Display name'),'Join location roster')+'</details>':'';
-    root.innerHTML=tools+`<div role="${isError?'alert':'status'}" class="lr-message${isError?' lr-error':''}">${safe(message)}</div>`+detail+enroll;
+    root.innerHTML=tools+`<div role="${isError?'alert':'status'}" tabindex="-1" class="lr-message${isError?' lr-error':''}">${safe(message)}</div>`+detail+enroll;
   }
   async function reload(){
     const [a,b]=await Promise.all([adapter.list(),permission(adapter.role).owner?adapter.assignees():Promise.resolve([])]);
-    reviews=a||[];assignees=b||[];if(!reviews.some(r=>r.id===currentId))currentId=reviews[0]?.id||'';
+    reviews=a||[];assignees=b||[];
+    if(adapter.demo&&currentId&&!reviews.some(r=>r.id===currentId))selectReview(reviews[0]?.id||'');
   }
-  async function switchRole(role){adapter.setRole(role);creating=false;message='';await reload();render()}
-  const warn=error=>{const box=root.querySelector('.lr-message');if(box){box.classList.add('lr-error');box.setAttribute('role','alert');box.textContent=error.message;box.scrollIntoView({block:'nearest'})}else root.innerHTML='<p role="alert">'+safe(error.message)+'</p>'};
+  function focus(selector){
+    const element=root.querySelector(selector);
+    if(!element)return;
+    if(!element.matches('a, button, select, input, textarea'))element.tabIndex=-1;
+    element.focus();
+  }
+  async function switchRole(role,selector){adapter.setRole(role);creating=false;message='';await reload();render();focus(selector)}
+  const warn=error=>{const box=root.querySelector('.lr-message');if(box){box.classList.add('lr-error');box.setAttribute('role','alert');box.textContent=error.message;box.focus()}else root.innerHTML='<p role="alert">'+safe(error.message)+'</p>'};
   root.addEventListener('click',async evt=>{
     const b=evt.target.closest('button');if(!b||busy)return;
     try{
@@ -150,20 +209,20 @@ export async function mountLaborReview(root,adapter){
         b.disabled=true;
         try{
           const module=await import('/assets/labor-import.mjs');
-          await module.openLaborImport(form,{location:adapter.location});
+          await module.openLaborImport(form,{location:adapter.location,locationCode:adapter.locationCode});
         }finally{b.disabled=false}
       }
       if(b.hasAttribute('data-print'))window.print();
-      if(b.hasAttribute('data-new')){creating=!creating;message='';isError=false;render()}
-      if(b.hasAttribute('data-switch'))await switchRole(b.dataset.switch);
-      if(b.hasAttribute('data-refresh')){await reload();message='Review is up to date.';isError=false;render()}
+      if(b.hasAttribute('data-new')){creating=!creating;message='';isError=false;render();focus(creating?'[data-op=create] input':'[data-new]')}
+      if(b.hasAttribute('data-switch'))await switchRole(b.dataset.switch,'[name=demo-role]');
+      if(b.hasAttribute('data-refresh')){await reload();message='Review is up to date.';isError=false;render();focus('.lr-message')}
     }catch(e){warn(e)}
   });
   root.addEventListener('change',async evt=>{
     const t=evt.target;
     try{
-      if(t.name==='demo-role')await switchRole(t.value);
-      if(t.name==='review-id'){currentId=t.value;creating=false;message='';isError=false;render()}
+      if(t.name==='demo-role')await switchRole(t.value,'[name=demo-role]');
+      if(t.name==='review-id'){selectReview(t.value);creating=false;message='';isError=false;render();focus('[name=review-id]')}
       if(t.hasAttribute('data-csv')&&t.files.length){
         if(t.files[0].size>256000)throw Error('Choose a one-week summary CSV under 250 KB.');
         const d=parseWeeklyCSV(await t.files[0].text()),f=t.closest('form');
@@ -184,29 +243,48 @@ export async function mountLaborReview(root,adapter){
       if(op==='enroll')await adapter.enroll(data.name);
       else{
         let payload=data;
-        if(['create','revise','compare'].includes(op)){
+        if(['create','revise','correct','compare'].includes(op)){
           payload={week_start:data.week_start,source:data.source,inputs:readInputs(fd)};
+          if(op==='correct')payload.note=data.note;
           if(op==='compare'){payload.note=data.note;payload.comparable=data.comparable==='yes'}
         }
         if(op==='assign'){payload.assignee_name=assignees.find(a=>a.id===data.assignee_id)?.name||'';if(data.next_review<data.due_date)throw Error('The next review must be on or after the due date.')}
         if(op==='verify')payload.amount=Number(data.amount);
-        const saved=await adapter.save(op==='create'?null:r.id,op==='create'?0:r.version,op,payload);currentId=saved.id;
+        const saved=await adapter.save(op==='create'?null:r.id,op==='create'?0:r.version,op,payload);selectReview(saved.id);
       }
-      await reload();creating=false;isError=false;message=op==='enroll'?'GM roster updated.':(historyNames[op]||'Review updated')+'.';render();
+      await reload();creating=false;isError=false;message=op==='enroll'?'GM roster updated.':(historyNames[op]||'Review updated')+'.';render();focus('.lr-message');
     }catch(e){warn(e)}finally{busy=false;for(const b of root.querySelectorAll('button, select'))b.disabled=false}
   });
   try{await reload();render()}catch(e){root.innerHTML='<div class="lr-message lr-error" role="alert"><strong>Weekly review unavailable.</strong> '+safe(e.message)+' <button type="button" data-refresh>Retry</button></div>'}
 }
 export function openAuthenticatedReview(root,context){
+  if(context.unavailable){
+    root.innerHTML='<div class="lr-app"><div class="lr-intro"><h1>Review unavailable</h1><p>Check this link with your team or choose an authorized location.</p><a href="#labor-review">Browse weekly labor reviews</a></div></div>';return;
+  }
   if(!context.locationId){
     root.innerHTML='<div class="lr-app"><div class="lr-intro"><h1>Weekly labor review</h1><div>Select one of your authorized locations above to open its private reviews.</div></div></div>';return;
   }
   const p={p_organization_id:context.orgId,p_location_id:context.locationId};
-  const adapter={demo:false,role:context.role,location:context.location,userId:context.userId,
+  const adapter={demo:false,role:context.role,location:context.location,locationCode:context.locationCode,userId:context.userId,
+    reviewId:context.reviewId,url:id=>`#labor-review/${context.locationId}/${id}`,
     list:()=>context.rpc('stabilis_labor_reviews',p),
     assignees:()=>context.rpc('stabilis_labor_assignees',p),
     enroll:name=>context.rpc('stabilis_enroll_labor_assignee',{...p,p_name:name}),
     save:(id,version,operation,payload)=>context.rpc('stabilis_save_labor_review',{...p,p_review_id:id,p_version:version,p_operation:operation,p_payload:payload})};
-  root.innerHTML='<div class="lr-app"><div class="lr-intro"><p>Stabilis Operator Intelligence™</p><h1>Weekly labor review</h1><div>Review the location’s records, agree on an action and compare the following week.</div></div><div data-labor-private></div></div>';
+  const intake=permission(context.role).analyst?'<p>The review stores the confirmed weekly figures and source references. Use <a href="#data">Data Quality &amp; Connections</a> to archive raw exports privately when the signed scope allows it. Add the file reference to the review.</p>':'';
+  root.innerHTML='<div class="lr-app"><div class="lr-intro"><p>Stabilis Operator Intelligence™</p><h1>Weekly labor review</h1><div>Review the location’s records, agree on an action and compare the following week.</div>'+intake+'</div><div data-labor-private></div></div>';
   return mountLaborReview(root.querySelector('[data-labor-private]'),adapter);
+}
+
+export async function linkLatestLaborReview(link,{rpc,orgId,locationId}){
+  if(!locationId)return;
+  try{
+    const reviews=await rpc('stabilis_labor_reviews',{p_organization_id:orgId,p_location_id:locationId});
+    const latest=reviews?.[0];
+    if(!link.isConnected||!latest?.id)return;
+    link.href=`#labor-review/${locationId}/${latest.id}`;
+    link.textContent=`Labor review · ${prettyDate(latest.week_start)}`;
+  }catch{
+    // Leave the review entry available while the list is unavailable.
+  }
 }
