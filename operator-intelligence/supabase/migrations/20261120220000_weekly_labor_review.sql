@@ -2,6 +2,16 @@
 -- Memberships, role_in_org and can_access_location come from the existing Stabilis foundation.
 begin;
 
+-- The historical tenant foundation is not fully tracked in Git. Confirm the
+-- persisted membership/location mapping used by the existing reference store.
+-- Fail atomically on a different foundation, before creating customer objects.
+do $$
+begin
+  if to_regclass('stabilis.membership_locations') is null then
+    raise exception 'Verify the staging location-grant relation against can_access_location before applying the labor migration';
+  end if;
+end $$;
+
 create table stabilis.labor_review_assignees (
   organization_id uuid not null references stabilis.organizations(id) on delete cascade,
   location_id uuid not null references stabilis.locations(id) on delete cascade,
@@ -98,6 +108,26 @@ begin
   return v;
 end $$;
 
+create function stabilis.labor_date(p jsonb,k text) returns date
+language plpgsql immutable set search_path = '' as $$
+declare v text := stabilis.labor_required_text(p,k);
+begin
+  if v !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then raise exception 'Supply % in YYYY-MM-DD format', k; end if;
+  return v::date;
+end $$;
+
+create function stabilis.labor_closed_week(p jsonb, p_location uuid) returns date
+language plpgsql stable set search_path = '' as $$
+declare
+  week_start date := stabilis.labor_date(p,'week_start');
+  local_today date;
+begin
+  select (now() at time zone coalesce(nullif(l.timezone,''),'UTC'))::date
+    into strict local_today from stabilis.locations l where l.id=p_location;
+  if week_start+7>local_today then raise exception 'Choose a completed fiscal week for this location'; end if;
+  return week_start;
+end $$;
+
 create function stabilis.labor_scope_role(org uuid, loc uuid) returns text
 language plpgsql stable set search_path = '' as $$
 declare r text := stabilis.role_in_org(org)::text;
@@ -128,6 +158,7 @@ begin
   return (select coalesce(jsonb_agg(jsonb_build_object('id',a.profile_id,'name',a.display_name) order by a.display_name),'[]'::jsonb)
     from stabilis.labor_review_assignees a join stabilis.memberships m
       on m.organization_id=a.organization_id and m.profile_id=a.profile_id and m.status='ACTIVE' and m.role::text='GENERAL_MANAGER'
+    join stabilis.membership_locations g on g.membership_id=m.id and g.location_id=a.location_id
     where a.organization_id=p_organization_id and a.location_id=p_location_id);
 end $$;
 
@@ -159,7 +190,7 @@ begin
   if p_operation='create' then
     if not reviewer then raise exception 'Analyst access required' using errcode='42501'; end if;
     if p_review_id is not null or p_version is distinct from 0 then raise exception 'Invalid initial review version'; end if;
-    period_start := stabilis.labor_required_text(p_payload,'week_start')::date;
+    period_start := stabilis.labor_closed_week(p_payload,p_location_id);
     normalized := jsonb_strip_nulls(p_payload->'inputs');
     m := stabilis.labor_metrics(normalized);
     note := stabilis.labor_required_text(p_payload,'source');
@@ -196,14 +227,15 @@ begin
       note := stabilis.labor_required_text(p_payload,'note');
       w.status := 'released';
     when 'assign' then
-      if not leader or w.status not in ('released','change_requested') then raise exception 'Leader approval of a released review required'; end if;
+      if not leader or w.status not in ('released','assigned','change_requested') then raise exception 'Leader approval of a released review required'; end if;
       assignee := stabilis.labor_required_text(p_payload,'assignee_id')::uuid;
       select a.display_name into member_name from stabilis.labor_review_assignees a join stabilis.memberships mm
         on mm.organization_id=a.organization_id and mm.profile_id=a.profile_id and mm.status='ACTIVE' and mm.role::text='GENERAL_MANAGER'
+        join stabilis.membership_locations g on g.membership_id=mm.id and g.location_id=a.location_id
         where a.organization_id=w.organization_id and a.location_id=w.location_id and a.profile_id=assignee;
       if not found then raise exception 'Choose an enrolled location GM'; end if;
-      due := stabilis.labor_required_text(p_payload,'due_date')::date;
-      next_review := stabilis.labor_required_text(p_payload,'next_review')::date;
+      due := stabilis.labor_date(p_payload,'due_date');
+      next_review := stabilis.labor_date(p_payload,'next_review');
       if due < w.week_start or next_review < due then raise exception 'Check the due and next-review dates'; end if;
       w.action := jsonb_build_object('title',stabilis.labor_required_text(p_payload,'title'),'assignee_id',assignee,
         'assignee_name',member_name,'due_date',due,'next_review',next_review,'approved_by',auth.uid());
@@ -224,7 +256,7 @@ begin
       w.status := 'evidence_submitted';
     when 'compare' then
       if not (reviewer or leader) or w.status not in ('evidence_submitted','compared') then raise exception 'Evidence and reviewer or leader access required'; end if;
-      period_start := stabilis.labor_required_text(p_payload,'week_start')::date;
+      period_start := stabilis.labor_closed_week(p_payload,p_location_id);
       if period_start<w.week_start+7 or (period_start-w.week_start)%7<>0 then raise exception 'Select a later aligned fiscal week'; end if;
       if jsonb_typeof(p_payload->'comparable') is distinct from 'boolean' then raise exception 'Confirm whether the weeks are comparable'; end if;
       normalized := jsonb_strip_nulls(p_payload->'inputs');
@@ -268,8 +300,8 @@ begin
   return to_jsonb(w);
 end $$;
 
-revoke all on function stabilis.labor_metrics(jsonb),stabilis.labor_required_text(jsonb,text),
-  stabilis.labor_scope_role(uuid,uuid) from public,anon,authenticated;
+revoke all on function stabilis.labor_metrics(jsonb),stabilis.labor_required_text(jsonb,text),stabilis.labor_date(jsonb,text),
+  stabilis.labor_scope_role(uuid,uuid),stabilis.labor_closed_week(jsonb,uuid) from public,anon,authenticated;
 revoke all on function public.stabilis_labor_assignees(uuid,uuid),
   public.stabilis_enroll_labor_assignee(uuid,uuid,text),public.stabilis_labor_reviews(uuid,uuid),
   public.stabilis_save_labor_review(uuid,uuid,uuid,integer,text,jsonb) from public,anon;

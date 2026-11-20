@@ -47,6 +47,7 @@ function breakdown(r){
   if(Number.isFinite(m.hours_over))findings.push(m.hours_over===0?'Paid hours matched the schedule.':'The team worked '+human(Math.abs(m.hours_over))+(m.hours_over>0?' more':' fewer')+' hours than scheduled.');
   const summary=findings.length?'<p>'+safe(findings.join(' '))+'</p>':'';
   return `<section class="lr-card"><div class="lr-resulthead"><div><p class="lr-kicker">Labor variance</p><div class="lr-big">${money(m.total_over==null?null:Math.abs(m.total_over))}</div><div>${signed(m.total_over)} at actual sales</div></div><div class="lr-status">Historical variance</div></div>${summary}<ul class="lr-break">${rows}</ul><dl class="lr-facts"><div><dt>Actual labor</dt><dd>${human(m.actual_pct,number,'%')}</dd></div><div><dt>Vs. target</dt><dd>${human(m.points_over,number,' pp')}</dd></div><div><dt>Hours vs. schedule</dt><dd>${human(m.hours_over,number,' h')}</dd></div></dl>
+    <p class="lr-print-only">Baseline source: ${safe(r.source||'Source reference unavailable')}.</p>
     <details><summary>Show the math and source records</summary><p class="lr-help">Positive values are unfavorable. Formula terms use the labor target as a fraction.</p>${lines(parts.map(([t,,f])=>[t,f]))}${lines(Object.entries(labels).map(([k,v])=>[v,human(r.inputs?.[k])]))}<p class="lr-help">Source: ${safe(r.source||'Source reference unavailable')}.</p></details>
     ${missing.length?`<p class="lr-help"><strong>Missing inputs:</strong> ${missing.map(k=>safe(labels[k])).join(', ')}. Related components stay open for investigation.</p>`:''}
     <p class="lr-help">The records explain the cost differences. A manager must confirm what happened on the shift.</p></section>`;
@@ -83,7 +84,7 @@ function actionForm(r,adapter,assignees){
 }
 function result(r,demo){
   const f=r.followup;
-  return section('Results',lines([['Modeled opportunity','No approved estimate'],['Baseline variance',money(r.metrics?.total_over)],['Following week variance',f?money(f.metrics?.total_over):'Awaiting next week'],['Observed change',!f?'Awaiting next week':f.comparable?money(f.observed_change):'Periods not comparable'],['Client-verified financial impact',r.verification?money(r.verification.amount):demo?'$0 · No finance validation':'No finance validation']])+(f?`<p class="lr-help">Week of ${prettyDate(f.week_start)} · ${safe(f.source||'Source unavailable')}. ${safe(f.note)}</p>`:'' )+(r.verification?`<p class="lr-help">Finance approval: ${safe(r.verification.finance_reference)}.</p>`:'<p class="lr-help">The historical variance and observed change do not add dollars to the Proof Ledger.</p>'));
+  return section('Results',lines([['Modeled opportunity','No approved estimate'],['Baseline variance',money(r.metrics?.total_over)],['Following week variance',f?money(f.metrics?.total_over):'Awaiting next week'],['Observed change',!f?'Awaiting next week':f.comparable?money(f.observed_change):'Periods not comparable'],['Client-verified financial impact',r.verification?money(r.verification.amount):demo?'$0 · No finance validation':'No finance validation']])+(f?`<p class="lr-help">Week of ${prettyDate(f.week_start)} · ${safe(f.source||'Source unavailable')}. ${safe(f.note)}</p>`:'' )+(r.verification?`<p class="lr-help">Finance approval: ${safe(r.verification.finance_reference)}.</p>`:'<p class="lr-help">The Proof Ledger requires separate finance validation.</p>'));
 }
 function history(r){return '<details><summary>Review history</summary><ol class="lr-activity">'+(r.history||[]).map(e=>`<li>${safe(historyNames[e.operation]||e.operation||e.event||e.status||'Review updated')} · ${prettyDate(e.at||e.created_at||e.timestamp)}${e.note?`<br>${safe(e.note)}`:''}</li>`).join('')+'</ol></details>'}
 function readInputs(fd){
@@ -126,7 +127,7 @@ export async function mountLaborReview(root,adapter){
     if(creating&&p.analyst)detail='<section class="lr-wide"><h2>New weekly review</h2>'+baselineEditor(demo)+'</section>';
     if(r&&!creating){
       const extra=p.analyst&&r.status==='draft'?'<details><summary>Correct the draft baseline</summary>'+baselineEditor(demo,r)+'</details>':'';
-      const due = r.action?.due_date && ['assigned','accepted','change_requested'].includes(r.status) && r.action.due_date < (demo?'2026-11-15':new Date().toISOString().slice(0,10));
+      const due = r.action?.due_date && ['assigned','accepted','change_requested'].includes(r.status) && r.action.due_date < new Date().toISOString().slice(0,10);
       const overdue=due?'<p class="lr-overdue">Action overdue · due '+prettyDate(r.action.due_date)+'</p>':'';
       const reopen=(p.owner||p.analyst)&&['compared','evidence_submitted','verified'].includes(r.status)?'<details class="lr-no-print"><summary>Reopen action</summary>'+form('reopen',note('note','Reason for reopening'),'Reopen action')+'</details>':'';
       detail=`<div class="lr-sectionhead lr-title"><div><p class="lr-kicker">${safe(adapter.location)}${demo?' · Fictional location':''}</p><h2 style="margin:0">Week of ${prettyDate(r.week_start)}</h2></div><span class="lr-status">${safe(statusNames[r.status]||r.status)}</span></div>

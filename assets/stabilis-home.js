@@ -4,7 +4,7 @@
 
   function setMenu(open) {
     menu.setAttribute('aria-expanded', String(open));
-    menu.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+    menu.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
     nav.toggleAttribute('data-open', open);
   }
 

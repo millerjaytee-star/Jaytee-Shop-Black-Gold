@@ -156,13 +156,15 @@ def test_private_weekly_cycle(db, local_site):
             context.route("**/*", lambda route: browser_transport(route, local_site, db))
             page = context.new_page()
             page.on("pageerror", lambda exc: errors.append(str(exc)))
-            page.goto(local_site + "/app#labor-review")
-            expect(page).to_have_url(local_site + "/login")
+            direct_link = name in {"analyst", "gm"}
+            page.goto(local_site + ("/app#labor-review" if direct_link else "/app"))
+            expect(page).to_have_url(local_site + ("/login?view=labor-review" if direct_link else "/login"))
             page.locator("#email").fill(name + "@fixture.invalid")
             page.locator("#password").fill("fixture-credential")
             page.locator("#loginForm button").click()
-            page.wait_for_url(local_site + "/app")
-            page.locator('.side-nav a[href="#labor-review"]').evaluate("(el) => el.click()")
+            page.wait_for_url(local_site + ("/app#labor-review" if direct_link else "/app"))
+            if not direct_link:
+                page.locator('a[href="#labor-review"]:visible').first.click()
             location = OUTSIDE_LOCATION if name == "outside" else LOCATION
             page.locator("#locationSelect").select_option(location)
             expect(page.locator("[data-labor-private] [data-refresh]")).to_be_visible()
@@ -198,13 +200,13 @@ def test_private_weekly_cycle(db, local_site):
             baseline.locator("input[type=file]").set_input_files(str(ROOT / "assets/labor-review-example.csv"))
             expect(baseline.locator('[name="actual_cost"]')).to_have_value("2700")
             # Independent from the months used in the SQL tests.
-            baseline.locator('[name="week_start"]').fill("2026-12-07")
+            baseline.locator('[name="week_start"]').fill("2026-10-05")
             operation(analyst, "create")
             expect(analyst.locator(".lr-big")).to_have_text("$450")
             expect(analyst.get_by_text("$250", exact=True)).to_be_visible()
             expect(analyst.get_by_text("$200", exact=True)).to_be_visible()
             refresh(owner)
-            expect(owner.get_by_text("Week of Dec 7, 2026")).to_have_count(0)
+            expect(owner.get_by_text("Week of Oct 5, 2026")).to_have_count(0)
             operation(analyst, "release", {"note": "Agreed weekly sales, payroll and schedule totals."})
             expect(analyst.locator(".lr-message")).to_have_text("Analyst released finding.")
             refresh(owner)
@@ -214,8 +216,8 @@ def test_private_weekly_cycle(db, local_site):
                 {
                     "title": "Review closing coverage",
                     "assignee_id": GM,
-                    "due_date": "2026-12-15",
-                    "next_review": "2026-12-18",
+                    "due_date": "2026-10-13",
+                    "next_review": "2026-10-16",
                 },
             )
             expect(owner.locator(".lr-message")).to_have_text("Action assigned.")
@@ -232,7 +234,7 @@ def test_private_weekly_cycle(db, local_site):
                 owner,
                 "compare",
                 {
-                    "week_start": "2026-12-14",
+                    "week_start": "2026-10-12",
                     "forecast_sales": 10000,
                     "actual_sales": 9600,
                     "target_pct": 25,
@@ -247,7 +249,7 @@ def test_private_weekly_cycle(db, local_site):
             )
             expect(owner.get_by_text("$390", exact=True)).to_be_visible()
             expect(owner.get_by_text("No finance validation", exact=True)).to_be_visible()
-            owner.get_by_text("Record finance validation", exact=True).click()
+            owner.locator("summary").filter(has_text="Record finance validation").click()
             operation(
                 owner,
                 "verify",
@@ -266,7 +268,7 @@ def test_private_weekly_cycle(db, local_site):
             refresh(outside)
             expect(outside.get_by_text("No weekly review available")).to_be_visible()
             expect(outside.get_by_text("$150", exact=True)).to_have_count(0)
-            state = next(r for r in db.read(OWNER) if r["week_start"] == "2026-12-07")
+            state = next(r for r in db.read(OWNER) if r["week_start"] == "2026-10-05")
             assert state["verification"]["amount"] == 150 and state["status"] == "verified"
             assert state["followup"]["observed_change"] == 390
             assert [x["operation"] for x in state["history"]] == [

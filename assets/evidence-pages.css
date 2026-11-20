@@ -77,3 +77,5 @@ body { font-size: 15px; line-height: 1.55; color: var(--text); background: var(-
   .report-section, .ledger-row, .proof-step { break-inside: avoid; }
   .table-wrap { overflow: visible; }
 }
+
+.report-shell .soft, .report-shell .brief { color: var(--muted); }

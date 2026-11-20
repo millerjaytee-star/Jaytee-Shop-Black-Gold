@@ -7,6 +7,7 @@ critical Operator Intelligence demo deep links. No customer credentials are used
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import time
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -148,7 +149,7 @@ def check_home(page: Page, mobile: bool) -> None:
     expect(chart.locator("#laborPct")).to_have_text("30.0%")
 
     if mobile:
-        menu = page.get_by_role("button", name="Open navigation")
+        menu = page.get_by_role("button", name="Open menu")
         menu.click()
         expect(page.locator("#siteNav")).to_be_visible()
         page.locator("#siteNav").get_by_role("link", name="Request a 20-minute fit call").click()
@@ -278,9 +279,9 @@ def labor_review_journey(browser: Browser) -> None:
     page.get_by_role("button", name="New weekly review").click()
     create = page.locator('form[data-op="create"]')
     create.locator("summary").click()
-    sample = b"week_start,actual_sales,target_pct,scheduled_hours,actual_hours,scheduled_cost,actual_cost,source\n2026-11-16,9000,25,125,135,2500,2700,QA fictional reports"
+    sample = b"week_start,actual_sales,target_pct,scheduled_hours,actual_hours,scheduled_cost,actual_cost,source\n2026-10-26,9000,25,125,135,2500,2700,QA fictional reports"
     create.locator('[data-csv]').set_input_files({"name":"sample.csv", "mimeType":"text/csv", "buffer":sample})
-    expect(create.locator('[name="week_start"]')).to_have_value("2026-11-16")
+    expect(create.locator('[name="week_start"]')).to_have_value("2026-10-26")
     expect(create.locator('[name="forecast_sales"]')).to_have_value("")
     submission("create").click()
     expect(page.locator(".lr-break")).to_contain_text("Needs data")
@@ -288,7 +289,7 @@ def labor_review_journey(browser: Browser) -> None:
     role.select_option("OWNER_EXECUTIVE")
     expect(page.locator('select[name="review-id"] option')).to_have_count(1)
     role.select_option("STABILIS_ANALYST")
-    page.locator('select[name="review-id"]').select_option(label="Nov 16, 2026")
+    page.locator('select[name="review-id"]').select_option(label="Oct 26, 2026")
     submission("release").click()
     role.select_option("OWNER_EXECUTIVE")
     expect(page.locator('select[name="review-id"] option')).to_have_count(2)
@@ -296,6 +297,43 @@ def labor_review_journey(browser: Browser) -> None:
     assert not errors, "weekly review browser errors:\n" + "\n".join(errors)
     context.close()
     print("Mobile owner–GM action, finance review, print, private draft and CSV intake: PASS")
+
+
+def check_daily_import(browser: Browser) -> None:
+    """Exercise the worksheet, date and location mapping used in the real review form."""
+    fixture = Path(__file__).resolve().parents[2] / "assets/labor-examples/weekly-reports.xlsx"
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    errors = []
+    attach_error_capture(page, errors)
+    page.goto(f"{BASE}/labor-review", wait_until="networkidle")
+    page.locator('select[name="demo-role"]').select_option("STABILIS_ANALYST")
+    page.locator("[data-new]").click()
+    form = page.locator('[data-op="create"]')
+    form.locator("[data-reconcile]").click()
+    dialog = page.get_by_role("dialog")
+    dialog.locator("[data-week]").fill("2026-10-26")
+    for report, sheet in [("sales", "Sales"), ("schedule", "Schedule"), ("payroll", "Payroll")]:
+        part = dialog.locator(f'[data-report="{report}"]')
+        part.locator("[data-file]").set_input_files(fixture)
+        part.locator("[data-sheet]").select_option(label=sheet)
+        part.locator("[data-location-value]").select_option(label="Juniper Café")
+    dialog.locator("[data-preview]").click()
+    expect(dialog.locator("[data-result]")).to_contain_text("2,700")
+    expect(dialog.locator("[data-result]")).to_contain_text("2,500")
+    expect(dialog.locator("[data-result]")).to_contain_text("9,000")
+    assert dialog.evaluate("(el) => el.scrollWidth <= el.clientWidth + 2")
+    dialog.locator("[data-apply]").click()
+    expect(dialog).to_have_count(0)
+    for field, value in [("forecast_sales", "10000"), ("actual_sales", "9000"),
+                         ("scheduled_hours", "125"), ("actual_hours", "135"),
+                         ("scheduled_cost", "2500"), ("actual_cost", "2700")]:
+        expect(form.locator(f'[name="{field}"]')).to_have_value(value)
+    reference = form.locator('[name="source"]').input_value()
+    for sheet in ["Sales", "Schedule", "Payroll"]:
+        assert sheet in reference
+    assert not errors, errors
+    page.close()
+    print("Mobile multi-report XLSX mapping, totals and source references: PASS")
 
 
 def main() -> None:
@@ -308,6 +346,7 @@ def main() -> None:
                 visit(browser, label, viewport)
             demo_deep_links(browser)
             labor_review_journey(browser)
+            check_daily_import(browser)
         finally:
             browser.close()
     print("STABILIS DEPLOY PREVIEW BROWSER QA = PASS")

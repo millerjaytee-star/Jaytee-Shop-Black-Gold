@@ -46,3 +46,16 @@ python scripts/run_analysis.py
 ```
 
 See `docs/architecture.md`, `docs/database.md`, `docs/intelligence-engine.md`, `docs/security-release-gate.md`, `docs/operator-intelligence-v1.md`, and `docs/deployment.md`.
+
+## Weekly labor review
+
+From the repository root, run `python3 operator-intelligence/scripts/preview_site.py --port 8080`, then open `http://127.0.0.1:8080/`. The public walkthrough is at `/labor-review`. It uses fictional information and saves changes in that browser. Client work opens at `/app#labor-review` and requires a real assigned organization and location.
+
+- **Owner:** Open the fictional review for Juniper Café, inspect the $450 overage, choose the manager and approve the action. Week 1 has $250 attributable to lower sales and $200 attributable to payroll above schedule.
+- **GM:** Switch the demo role to General manager, accept the assignment and submit evidence. Authenticated users receive their assigned role from their membership.
+- **Owner or analyst:** Compare the second week, record whether the periods are comparable, and print the review. Using the example inputs, variance falls to $125, an observed improvement of $325. Verified Value remains $0 until documented client finance validation.
+- **Analyst:** Open a new review to inspect intake and release. Source references, corrections, review state and history accompany the underlying weekly totals.
+
+The Netlify preview can run the public example independently of Supabase. The authenticated workflow requires the dedicated Stabilis backend to be active and `operator-intelligence/supabase/migrations/20261120220000_weekly_labor_review.sql` to have been applied in the target environment. Validate isolated users, existing tenant-role grants and access before enabling client work. Netlify handles the public fit-call form. A loopback server serves the pages and does not process a real submission.
+
+The optional production AI readiness probe uses a private `STABILIS_AI_HEALTH_SECRET` shared by the Netlify production function and the GitHub Actions production job. Configure a fresh value if that probe is needed. The preview checks unauthenticated behavior without running a billable model request.

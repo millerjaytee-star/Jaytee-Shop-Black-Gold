@@ -71,6 +71,8 @@ jobs:
           payload=json.loads(Path('outputs/ci-pipeline-smoke.json').read_text())
           assert round(float(payload['recoverable_total']),2)==392570.56, payload['recoverable_total']
           PY
+      - name: Install Chromium for browser release QA
+        run: python -m playwright install --with-deps chromium
       - name: Unit, integration, financial and release contract tests
         run: pytest -q
       - name: Compile check
@@ -118,8 +120,6 @@ jobs:
         run: ruff check src scripts tests
       - name: Type check core calculation and security modules
         run: mypy src/application/security.py src/application/fiscal.py src/scoring/confidence.py src/scoring/priority.py src/metrics/engine.py
-      - name: Install Chromium for browser release QA
-        run: python -m playwright install --with-deps chromium
       - name: Netlify deploy-preview browser QA
         if: github.event_name == 'pull_request'
         env:
@@ -132,7 +132,7 @@ jobs:
         if: github.event_name == 'push'
         env:
           STABILIS_RELEASE_BASE_URL: https://stabilis-ops-group.netlify.app
-          STABILIS_CHECK_AI_PROVIDER: "1"
+          STABILIS_AI_HEALTH_SECRET: ${{ secrets.STABILIS_AI_HEALTH_SECRET }}
           STABILIS_EXPECT_RELEASE_MARKER: stabilis-operator-intelligence-10x-20260901
         run: |
           python scripts/release_preview_qa.py

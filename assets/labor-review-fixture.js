@@ -47,6 +47,13 @@ export function demoAdapter(){
     async save(id,version,operation,payload){
       const apply=()=>{
         const state=read();
+        if(['create','compare'].includes(operation)){
+          const format=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+          const today=Object.fromEntries(format.formatToParts(new Date()).map(part=>[part.type,part.value]));
+          const cutoff=Date.parse(today.year+'-'+today.month+'-'+today.day+'T00:00:00Z');
+          const start=Date.parse(payload.week_start+'T00:00:00Z');
+          if(!Number.isFinite(start)||start+7*86400000>cutoff)throw Error('Select a fiscal week that has fully closed at the pilot location.');
+        }
         let review=state.reviews.find(r=>r.id===id);
         if(operation==='create'){
           if(actor!=='STABILIS_ANALYST')throw Error('Switch to the analyst role to create a review.');
