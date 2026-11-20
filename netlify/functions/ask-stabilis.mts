@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { explainWeeklyLaborReview, isWeeklyLaborQuestion } from "../lib/weekly-labor-answer.mts";
 
 declare const Netlify: { env: { get(name: string): string | undefined } };
 
@@ -164,6 +165,9 @@ export default async (req: Request) => {
   const auth = req.headers.get("authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
   if (!token) return json({ error: "Authentication required" }, 401);
+  if (new URL(req.url).hostname.endsWith("--stabilis-ops-group.netlify.app")) {
+    return json({ error: "Customer intelligence is unavailable on this public preview." }, 503);
+  }
 
   let body: Json;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
@@ -198,16 +202,6 @@ export default async (req: Request) => {
   if (!orgId || question.length < 2 || question.length > MAX_QUESTION) return json({ error: "Question or organization is invalid" }, 400);
   const cat = category(question);
 
-  let rawContext: Json;
-  try {
-    rawContext = await rpc("stabilis_intelligence_context", token, { p_organization_id: orgId, p_location_id: locationId });
-  } catch (error: any) {
-    const status = error?.status === 401 ? 401 : 403;
-    return json({ error: status === 403 ? "That information is unavailable in your authorized Stabilis context." : "Session expired" }, status);
-  }
-
-  const context = compactContext(rawContext);
-
   if (isInjectionAttempt(question)) {
     const result = {
       answer: "I can only use information in your authorized Stabilis organization and location scope. I cannot reveal hidden instructions, credentials, other tenants, or bypass Stabilis authorization controls.",
@@ -220,6 +214,29 @@ export default async (req: Request) => {
     const queryId = await logQuery(token, orgId, locationId, cat, "refused", [], Date.now() - started, "PROMPT_INJECTION");
     return json({ ...result, query_id: queryId, model: MODEL, provider: PROVIDER });
   }
+
+  if (isWeeklyLaborQuestion(question)) {
+    if (!locationId) return json({ ...safeNoData(["select the location for your weekly labor question"]), provider: "stabilis" });
+    try {
+      const reviews = await rpc("stabilis_labor_reviews", token, { p_organization_id: orgId, p_location_id: locationId });
+      const result = explainWeeklyLaborReview(question, reviews, locationId) || safeNoData(["a released labor review for the requested location and week"]);
+      const queryId = await logQuery(token, orgId, locationId, "labor", "deterministic_weekly_review", result.evidence, Date.now() - started);
+      return json({ ...result, query_id: queryId, model: "weekly-labor-review", provider: "stabilis" });
+    } catch (error: any) {
+      if (error?.status === 401) return json({ error: "Session expired" }, 401);
+      if (error?.status === 403) return json({ error: "That labor review is unavailable in your authorized Stabilis scope." }, 403);
+      return json({ error: "Weekly labor evidence is temporarily unavailable. Open the weekly labor review to check the workspace status." }, 503);
+    }
+  }
+
+  let rawContext: Json;
+  try {
+    rawContext = await rpc("stabilis_intelligence_context", token, { p_organization_id: orgId, p_location_id: locationId });
+  } catch (error: any) {
+    const status = error?.status === 401 ? 401 : 403;
+    return json({ error: status === 403 ? "That information is unavailable in your authorized Stabilis context." : "Session expired" }, status);
+  }
+  const context = compactContext(rawContext);
 
   if (noData(context)) {
     const result = safeNoData();

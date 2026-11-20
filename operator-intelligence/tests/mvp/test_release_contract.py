@@ -40,7 +40,7 @@ def test_public_demo_contract():
     assert 'HHR-07' in demo_data and '102844.37' in demo_data
     assert 'location/' in demo_app
 
-    assert 'Modeled Recoverable' in report
+    assert all(label in report for label in ('Modeled opportunity', 'Observed change', 'Client-verified financial impact'))
     assert 'Verified Value' in report
     assert '$392,570.56' in report
 
@@ -65,10 +65,9 @@ def test_public_demo_contract():
     assert 'stabilis_my_locations' in secure_js
     assert 'stabilis_workspace_payload' in secure_js
 
-    assert 'Stabilize. Systemize. Scale.' in home
-    assert 'Profit Leak Score' in home
-    assert 'Book a Diagnostic' in home
-    for required_surface in ['operator-intelligence.html','operator-intelligence-report.html','login.html','app.html']:
+    assert 'id="score"' in home
+    assert 'Request a 20-minute fit call' in home and '/labor-review' in home
+    for required_surface in ['operator-intelligence.html','operator-intelligence-report.html','login.html','app.html','labor-review.html']:
         assert (REPO / required_surface).exists(), required_surface
 
     assert 'CONTROLLED PILOT FINANCIAL DATA RELEASE GATE = PASSED' in gate

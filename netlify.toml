@@ -1,5 +1,6 @@
 [build]
-  publish = "."
+  command = "python3 operator-intelligence/scripts/build_site.py"
+  publish = "dist/netlify"
 
 [[headers]]
   for = "/*"

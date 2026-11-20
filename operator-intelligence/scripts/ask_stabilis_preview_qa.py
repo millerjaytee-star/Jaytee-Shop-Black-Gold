@@ -11,8 +11,12 @@ if not BASE:
     raise SystemExit("STABILIS_RELEASE_BASE_URL is required")
 
 
-def get(path: str) -> tuple[int, str]:
+def get(path: str, *, secret: str | None = None) -> tuple[int, str]:
     req = Request(BASE + path, headers={"User-Agent": "StabilisAskQA/1.0"})
+    if secret:
+        if BASE != "https://stabilis-ops-group.netlify.app" or path != "/api/stabilis-ai-health":
+            raise ValueError("The provider check requires the configured production health endpoint.")
+        req.add_unredirected_header("Authorization", "Bearer " + secret)
     try:
         with urlopen(req, timeout=45) as response:
             return response.status, response.read().decode("utf-8")
@@ -52,7 +56,12 @@ def main() -> None:
     assert "Authentication required" in body, body
     print("ASK STABILIS UNAUTHENTICATED SECURITY SMOKE = PASS")
 
-    status, body = get("/api/stabilis-ai-health?token=stabilis-health-a81f9d4c-20260901")
+    secret = os.environ.get("STABILIS_AI_HEALTH_SECRET")
+    if not secret:
+        print("Live AI provider probe is disabled for this run.")
+        return
+
+    status, body = get("/api/stabilis-ai-health", secret=secret)
     assert status == 200, (status, body)
     payload = json.loads(body)
     assert payload.get("ok") is True, payload

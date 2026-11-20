@@ -8,11 +8,13 @@ on:
       - 'assets/**'
       - 'netlify/**'
       - 'tests/**'
+      - 'scripts/sync-founding-offer.mjs'
       - 'operator-intelligence/**'
       - '_redirects'
       - 'netlify.toml'
       - 'stabilis-config.js'
       - 'stabilis-release-marker.txt'
+      - 'favicon.ico'
       - '.github/workflows/stabilis-ci.yml'
   push:
     branches: [main]
@@ -22,11 +24,13 @@ on:
       - 'assets/**'
       - 'netlify/**'
       - 'tests/**'
+      - 'scripts/sync-founding-offer.mjs'
       - 'operator-intelligence/**'
       - '_redirects'
       - 'netlify.toml'
       - 'stabilis-config.js'
       - 'stabilis-release-marker.txt'
+      - 'favicon.ico'
       - '.github/workflows/stabilis-ci.yml'
 
 permissions:
@@ -43,7 +47,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Opportunity Scout behavior tests
+      - name: Browser module behavior tests
         working-directory: .
         run: node --experimental-strip-types --test tests/*.test.mjs
       - uses: actions/setup-python@v5
@@ -71,6 +75,8 @@ jobs:
           payload=json.loads(Path('outputs/ci-pipeline-smoke.json').read_text())
           assert round(float(payload['recoverable_total']),2)==392570.56, payload['recoverable_total']
           PY
+      - name: Install Chromium for browser release QA
+        run: python -m playwright install --with-deps chromium
       - name: Unit, integration, financial and release contract tests
         run: pytest -q
       - name: Compile check
@@ -90,7 +96,15 @@ jobs:
       - name: Static production build contract
         working-directory: .
         run: |
-          test -s index.html
+          python operator-intelligence/scripts/build_site.py
+          test ! -e dist/netlify/docs
+          test ! -e dist/netlify/operator-intelligence
+          test ! -e dist/netlify/netlify
+          test -s dist/netlify/_redirects
+          test -s dist/netlify/assets/labor-examples/weekly-reports.xlsx
+          test -s dist/netlify/favicon.ico
+          grep -q 'preview: true' dist/netlify/stabilis-config.js
+          test -s dist/netlify/index.html
           test -s operator-intelligence.html
           test -s operator-intelligence-report.html
           test -s login.html
@@ -118,8 +132,6 @@ jobs:
         run: ruff check src scripts tests
       - name: Type check core calculation and security modules
         run: mypy src/application/security.py src/application/fiscal.py src/scoring/confidence.py src/scoring/priority.py src/metrics/engine.py
-      - name: Install Chromium for browser release QA
-        run: python -m playwright install --with-deps chromium
       - name: Netlify deploy-preview browser QA
         if: github.event_name == 'pull_request'
         env:
@@ -132,6 +144,7 @@ jobs:
         if: github.event_name == 'push'
         env:
           STABILIS_RELEASE_BASE_URL: https://stabilis-ops-group.netlify.app
+          STABILIS_AI_HEALTH_SECRET: ${{ secrets.STABILIS_AI_HEALTH_SECRET }}
           STABILIS_EXPECT_RELEASE_MARKER: stabilis-operator-intelligence-10x-20260901
         run: |
           python scripts/release_preview_qa.py

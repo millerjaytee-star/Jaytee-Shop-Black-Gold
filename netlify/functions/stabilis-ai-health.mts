@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 declare const Netlify: { env: { get(name: string): string | undefined } };
 
@@ -8,9 +9,12 @@ const J = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
 });
 
 export default async (req: Request) => {
-  const url = new URL(req.url);
-  const challenge = Netlify.env.get("STABILIS_AI_HEALTH_TOKEN") || "";
-  if (!challenge || url.searchParams.get("token") !== challenge) return J({ ok: false }, 404);
+  const secret = Netlify.env.get("STABILIS_AI_HEALTH_SECRET");
+  const authorization = req.headers.get("authorization") || "";
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  if (!secret || !timingSafeEqual(digest(authorization), digest("Bearer " + secret))) {
+    return J({ ok: false }, 404);
+  }
 
   // Netlify AI Gateway injects OPENAI_API_KEY and OPENAI_BASE_URL into the
   // function runtime. The official OpenAI SDK consumes both automatically.
