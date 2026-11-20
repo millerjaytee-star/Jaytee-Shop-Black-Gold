@@ -132,6 +132,7 @@ jobs:
         if: github.event_name == 'push'
         env:
           STABILIS_RELEASE_BASE_URL: https://stabilis-ops-group.netlify.app
+          STABILIS_CHECK_AI_PROVIDER: "1"
           STABILIS_EXPECT_RELEASE_MARKER: stabilis-operator-intelligence-10x-20260901
         run: |
           python scripts/release_preview_qa.py

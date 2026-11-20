@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[3]
 MIGRATION_DIR = ROOT / 'operator-intelligence/supabase/migrations'
@@ -9,12 +10,14 @@ def text(name: str) -> str:
 def migration_text() -> str:
     return '\n'.join(p.read_text() for p in sorted(MIGRATION_DIR.glob('20260901164*.sql'))).lower()
 
-def test_public_home_is_product_first_and_financially_safe():
-    home=text('index.html')
-    assert 'OPERATOR INTELLIGENCE' in home
-    assert 'See where margin is moving' in home
-    assert 'FICTIONAL' in home and '$392,570.56' in home and 'Verified Value' in home
-    assert 'Profit Leak Score' in home and 'Request Diagnostic Review' in home
+def test_public_home_explains_the_pilot_and_labels_fictional_results():
+    home = text('index.html')
+    copy = ' '.join(re.sub(r'<[^>]+>', ' ', home).split())
+    assert 'operator intelligence' in copy.lower()
+    assert 'fictional' in copy.lower() and '$392,570.56' in copy and 'Verified Value' in copy
+    assert 'Profit Leak Score' in copy and 'Request a 20-minute fit call' in copy
+    assert '14-Day Margin Recovery Diagnostic' in copy and '$1,500' in copy
+    assert '/labor-review' in home
     assert 'data-netlify' in home
 
 def test_demo_preserves_canonical_financial_contract_and_modules():

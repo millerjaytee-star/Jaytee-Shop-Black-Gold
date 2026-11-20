@@ -11,7 +11,7 @@ import time
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from playwright.sync_api import Browser, Page, Request as PlaywrightRequest, sync_playwright
+from playwright.sync_api import Browser, Page, Request as PlaywrightRequest, expect, sync_playwright
 
 BASE = os.environ.get("STABILIS_RELEASE_BASE_URL", "").rstrip("/")
 if not BASE:
@@ -19,6 +19,7 @@ if not BASE:
 
 ROUTES = [
     "/",
+    "/labor-review",
     "/operator-intelligence",
     "/operator-intelligence-report",
     "/login",
@@ -133,6 +134,43 @@ def attach_error_capture(page: Page, errors: list[str]) -> None:
     )
 
 
+def check_home(page: Page, mobile: bool) -> None:
+    chart = page.locator("#heroLab")
+    expect(chart.locator("#laborGap")).to_have_text("$450")
+    expect(chart.locator("#salesEffect")).to_have_text("$250")
+    expect(chart.locator("#payrollEffect")).to_have_text("$200")
+    chart.get_by_role("button", name="Week 2").click()
+    expect(chart.locator("#laborGap")).to_have_text("$125")
+    expect(chart.locator("#salesEffect")).to_have_text("$125")
+    expect(chart.locator("#payrollEffect")).to_have_text("$0")
+    expect(chart.locator("#laborPct")).to_have_text("26.3%")
+    chart.get_by_role("button", name="Week 1").click()
+    expect(chart.locator("#laborPct")).to_have_text("30.0%")
+
+    if mobile:
+        menu = page.get_by_role("button", name="Open navigation")
+        menu.click()
+        expect(page.locator("#siteNav")).to_be_visible()
+        page.locator("#siteNav").get_by_role("link", name="Request a 20-minute fit call").click()
+        assert page.url.endswith("#diagnostic")
+    form = page.locator('form[name="stabilis-pilot"]')
+    assert form.get_attribute("method").lower() == "post"
+    expect(form.locator('select[name="locations"]')).to_have_value("")
+    form.locator('select[name="locations"]').select_option(label="3–15")
+    assert not form.evaluate("(form) => form.checkValidity()")
+
+    sliders = page.locator("#score input[data-score]")
+    expect(sliders).to_have_count(5)
+    for slider in sliders.all():
+        slider.fill("100")
+    expect(page.locator("#scoreValue")).to_have_text("100")
+    expect(page.locator("#scoreBand")).to_have_text("CONTROL STRONG")
+    links = page.get_by_role("link", name="Try the labor review")
+    assert links.count() >= 1
+    for link in links.all():
+        expect(link).to_have_attribute("href", "/labor-review")
+
+
 def visit(browser: Browser, label: str, viewport: dict[str, int]) -> None:
     context = browser.new_context(viewport=viewport)
     page = context.new_page()
@@ -150,6 +188,8 @@ def visit(browser: Browser, label: str, viewport: dict[str, int]) -> None:
         assert width <= client + 4, f"{label} horizontal overflow on {path}: {width}>{client}"
         body = page.locator("body").inner_text(timeout=10_000)
         assert body.strip(), f"blank body on {path}"
+        if path == "/":
+            check_home(page, mobile=(label == "mobile"))
     context.close()
     assert not errors, f"{label} browser errors:\n" + "\n".join(errors)
     print(f"{label}: routes/console/assets/responsive PASS")
@@ -176,15 +216,98 @@ def demo_deep_links(browser: Browser) -> None:
     print("Demo deep links and financial smoke: PASS")
 
 
+def labor_review_journey(browser: Browser) -> None:
+    """Follow the fictional owner and GM through the same persisted review."""
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    errors: list[str] = []
+    attach_error_capture(page, errors)
+    writes = []
+    page.on("request", lambda request: writes.append(request.method) if request.method != "GET" else None)
+    page.goto(f"{BASE}/labor-review", wait_until="networkidle")
+    role = page.locator('select[name="demo-role"]')
+    expect(page.locator(".lr-big")).to_contain_text("$450")
+    expect(page.locator(".lr-break")).to_contain_text("$250")
+    expect(page.locator(".lr-break")).to_contain_text("$200")
+    role.select_option("READ_ONLY")
+    expect(page.locator('form[data-op="assign"]')).to_have_count(0)
+    role.select_option("OWNER_EXECUTIVE")
+
+    def submission(operation):
+        return page.locator(f'form[data-op="{operation}"] [type="submit"]')
+
+    title = "Review closing coverage with the shift lead"
+    page.locator('[data-op="assign"] [name="title"]').fill(title)
+    submission("assign").click()
+    role.select_option("GENERAL_MANAGER")
+    expect(page.get_by_text(title, exact=True)).to_be_visible()
+    submission("accept").click()
+    evidence = "QA example: shift lead matched all seven close schedules to paid hours."
+    page.locator('[data-op="submit_evidence"] [name="note"]').fill(evidence)
+    submission("submit_evidence").click()
+    role.select_option("OWNER_EXECUTIVE")
+    page.locator('[data-op="compare"] [name="comparable"]').select_option("yes")
+    submission("compare").click()
+    results = page.locator("section").filter(has=page.get_by_role("heading", name="Results", exact=True)).last
+    expect(results).to_contain_text("$325")
+    expect(results).to_contain_text("$0")
+    expect(page.locator('form[data-op="verify"]')).to_have_count(1)
+    page.reload(wait_until="networkidle")
+    expect(results).to_contain_text("$325")
+    expect(page.get_by_text(evidence, exact=True).first).to_be_visible()
+    expect(page.locator('form[data-op="assign"]')).to_have_count(0)
+    page.get_by_text("Record finance validation", exact=True).click()
+    verify = page.locator('form[data-op="verify"]')
+    verify.locator('[name="amount"]').fill("400")
+    assert not verify.locator('[name="amount"]').evaluate("(input) => input.checkValidity()")
+    verify.locator('[name="amount"]').fill("125")
+    verify.locator('[name="finance_reference"]').fill("Fictional signed finance memo")
+    verify.locator('[name="attribution"]').fill("Only supported hours included")
+    verify.locator('[name="overlap_check"]').fill("Overtime excluded from this amount")
+    submission("verify").click()
+    expect(results).to_contain_text("Fictional signed finance memo")
+    expect(results.locator("dt").get_by_text("Client-verified financial impact").locator("..")).to_contain_text("$125")
+    page.emulate_media(media="print")
+    expect(page.locator("[data-print]")).to_be_hidden()
+    expect(results).to_be_visible()
+    page.emulate_media(media="screen")
+
+    # Import a second synthetic week with no forecast. Usable actuals survive,
+    # and an unreleased analyst draft stays out of the owner's review list.
+    role.select_option("STABILIS_ANALYST")
+    page.get_by_role("button", name="New weekly review").click()
+    create = page.locator('form[data-op="create"]')
+    create.locator("summary").click()
+    sample = b"week_start,actual_sales,target_pct,scheduled_hours,actual_hours,scheduled_cost,actual_cost,source\n2026-11-16,9000,25,125,135,2500,2700,QA fictional reports"
+    create.locator('[data-csv]').set_input_files({"name":"sample.csv", "mimeType":"text/csv", "buffer":sample})
+    expect(create.locator('[name="week_start"]')).to_have_value("2026-11-16")
+    expect(create.locator('[name="forecast_sales"]')).to_have_value("")
+    submission("create").click()
+    expect(page.locator(".lr-break")).to_contain_text("Needs data")
+    expect(page.locator(".lr-facts")).to_contain_text("10 h")
+    role.select_option("OWNER_EXECUTIVE")
+    expect(page.locator('select[name="review-id"] option')).to_have_count(1)
+    role.select_option("STABILIS_ANALYST")
+    page.locator('select[name="review-id"]').select_option(label="Nov 16, 2026")
+    submission("release").click()
+    role.select_option("OWNER_EXECUTIVE")
+    expect(page.locator('select[name="review-id"] option')).to_have_count(2)
+    assert not writes, "Fictional demo sent a write request"
+    assert not errors, "weekly review browser errors:\n" + "\n".join(errors)
+    context.close()
+    print("Mobile owner–GM action, finance review, print, private draft and CSV intake: PASS")
+
+
 def main() -> None:
     wait_for_preview()
     check_headers()
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(executable_path=os.environ.get("STABILIS_CHROMIUM_PATH"), headless=True)
         try:
             for label, viewport in VIEWPORTS:
                 visit(browser, label, viewport)
             demo_deep_links(browser)
+            labor_review_journey(browser)
         finally:
             browser.close()
     print("STABILIS DEPLOY PREVIEW BROWSER QA = PASS")

@@ -52,6 +52,10 @@ def main() -> None:
     assert "Authentication required" in body, body
     print("ASK STABILIS UNAUTHENTICATED SECURITY SMOKE = PASS")
 
+    if os.environ.get("STABILIS_CHECK_AI_PROVIDER", "0") != "1":
+        print("Live AI provider probe is disabled for this run.")
+        return
+
     status, body = get("/api/stabilis-ai-health?token=stabilis-health-a81f9d4c-20260901")
     assert status == 200, (status, body)
     payload = json.loads(body)
