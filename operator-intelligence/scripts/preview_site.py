@@ -45,6 +45,11 @@ class PreviewHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             return BytesIO(content)
         target, status = ROUTES.get(requested.path, (requested.path, 200))
+        if target == requested.path:
+            for pattern, route in ROUTES.items():
+                if pattern.endswith("*") and fnmatchcase(requested.path, pattern):
+                    target, status = route
+                    break
         if status in (301, 302, 307, 308):
             self.send_response(status)
             url = urlsplit(target)

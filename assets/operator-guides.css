@@ -65,6 +65,21 @@ h2 { font-size: clamp(1.65rem, 3.1vw, 2.6rem); line-height: 1.14; letter-spacing
 .steps li { padding: 17px 0; border-bottom: 1px solid var(--rule); }
 .steps li strong { display: block; margin-bottom: 3px; }
 .steps li span { color: var(--muted); }
+.support-form { display: grid; gap: 18px; max-width: 62ch; justify-items: start; }
+.support-form > div { width: 100%; }
+.support-form label { display: block; margin-bottom: 5px; font-weight: 650; }
+.support-form input, .support-form select, .support-form textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #697967;
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+}
+.support-form textarea { resize: vertical; }
+.support-hint { margin-top: 4px; color: var(--muted); font-size: .9rem; }
 @media (max-width: 720px) {
   .guide-wrap { width: calc(100% - 36px); }
   .guide-nav { min-height: 60px; }

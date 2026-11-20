@@ -57,6 +57,9 @@
 .lr-root details{margin-top:14px;border-top:1px solid var(--lr-rule)}.lr-root summary{cursor:pointer;font-weight:650;color:var(--lr-accent);min-height:44px;padding-block:10px}
 .lr-field{display:grid;gap:4px;font-size:13px;font-weight:650;margin:9px 0}
 .lr-field input,.lr-field select,.lr-field textarea{font-size:14px;font-weight:400;width:100%}
+.lr-source-consent{display:flex;align-items:center;gap:10px;min-height:44px}
+.lr-source-consent input[type=checkbox]{width:20px;height:20px;flex:none}
+.lr-source-entry{border-top:1px solid var(--lr-rule);margin-top:12px;padding-top:12px;overflow-wrap:anywhere}
 .lr-formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}
 .lr-wide{margin:16px 0}
 #labor-scenarios .lr-field{max-width:24rem}

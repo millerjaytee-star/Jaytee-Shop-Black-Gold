@@ -5,7 +5,7 @@ export const reportTypes = {
   payroll: { name: "Paid labor", fields: ["actual_hours", "actual_cost"] },
 };
 export const fieldNames = {
-  date: "Business date", location: "Location", role: "Role or department",
+  date: "Business date", location: "Location", role: "Role or department", daypart: "Daypart",
   actual_sales: "Net sales ($)", forecast_sales: "Forecast net sales ($)",
   scheduled_hours: "Scheduled hours", scheduled_cost: "Scheduled labor ($)",
   actual_hours: "Paid hours", actual_cost: "Paid labor ($)",
@@ -14,6 +14,7 @@ const aliases = {
   date: ["date", "business date", "trading date", "work date", "shift date"],
   location: ["location", "site", "site name", "store", "store name", "location id", "location name", "unit"],
   role: ["role", "position", "department", "job", "job title", "job code"],
+  daypart: ["daypart", "day part", "service period", "shift period"],
   actual_sales: ["net sales", "actual net sales", "actual sales", "net sales dollars"],
   forecast_sales: ["forecast sales", "sales forecast", "forecast net sales", "planned sales"],
   scheduled_hours: ["scheduled hours", "approved scheduled hours", "sched hours", "planned hours"],
@@ -25,7 +26,7 @@ function normalize(value) {
   return String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 export function fieldsFor(type) {
-  return ["date", "location", ...(type === "sales" ? [] : ["role"]), ...reportTypes[type].fields];
+  return ["date", "location", ...(type === "sales" ? [] : ["role", "daypart"]), ...reportTypes[type].fields];
 }
 export function guessMapping(type, headers) {
   return Object.fromEntries(fieldsFor(type).map(key => {
@@ -35,6 +36,20 @@ export function guessMapping(type, headers) {
     }, []);
     return [key, matches.length === 1 ? matches[0] : -1];
   }));
+}
+
+export function canArchiveReport({rows, headerIndex, mapping, selectedLocation}) {
+  const headers = rows[headerIndex];
+  const knownLocationColumns = headers.flatMap((label, index) => aliases.location.includes(normalize(label)) ? [index] : []);
+  const locationColumns = new Set(knownLocationColumns);
+  if (mapping.location >= 0) locationColumns.add(mapping.location);
+  const data = rows.slice(headerIndex + 1).filter(row => row.some(value => String(value ?? "").trim()));
+  for (const column of locationColumns) {
+    const values = new Set(data.map(row => String(row[column] ?? "").trim()));
+    if (values.size !== 1 || values.has("")) return false;
+    if (column === mapping.location && !values.has(selectedLocation)) return false;
+  }
+  return true;
 }
 
 export function parseDelimited(text) {
@@ -130,6 +145,8 @@ export function aggregateReport({type, rows, headerIndex, mapping, selectedLocat
   if (assigned.some(i => i >= rows[headerIndex].length || !String(rows[headerIndex][i] ?? "").trim())) throw Error("Map named source columns only.");
   const matchedDays = new Set();
   const seen = new Set();
+  const groupTotals = new Map();
+  const dimensions = ["role", "daypart"].filter(key => mapping[key] >= 0);
   const sums = Object.fromEntries(mapped.map(k => [k, 0]));
   const missingCells = new Set();
   let count = 0, skipped = 0;
@@ -141,17 +158,35 @@ export function aggregateReport({type, rows, headerIndex, mapping, selectedLocat
     const date = businessDate(r[mapping.date], date1904);
     if (!date) throw Error("Row " + rowNo + " has no valid business date. Use YYYY-MM-DD, US M/D/YYYY, or an Excel date.");
     if (!days.includes(date)) { skipped++; continue; }
-    const roleValue = mapping.role >= 0 ? String(r[mapping.role] ?? "").trim() : "";
-    if (mapping.role >= 0 && !roleValue) throw Error("Row " + rowNo + " is missing its role. Remove subtotal rows or correct the role.");
-    if (/^(?:grand )?(?:total|subtotal|all roles|all departments)$/i.test(roleValue)) throw Error("Row " + rowNo + " is a subtotal. Remove totals when using detail rows.");
-    const key = date + "\u0000" + roleValue.toLowerCase();
-    if (seen.has(key)) throw Error("Duplicate " + date + (roleValue ? " / " + roleValue : "") + " at row " + rowNo + ". Use daily totals or map a distinct role on each labor row.");
+    const dimensionValues = dimensions.map(key => {
+      const label = String(r[mapping[key]] ?? "").replace(/[\u0000-\u001f\u007f]+/g," ").trim();
+      if (!label) throw Error(`Row ${rowNo} is missing its ${key}. Remove subtotal rows or correct the ${key}.`);
+      if (/^(?:grand )?(?:total|subtotal|all roles|all departments|all dayparts|all shifts)$/i.test(label)) {
+        throw Error(`Row ${rowNo} is a subtotal. Remove totals when using detail rows.`);
+      }
+      if (label.length > 100) throw Error(`Row ${rowNo}: use a ${key} label of at most 100 characters.`);
+      return label;
+    });
+    const normalized = dimensionValues.map(label => label.toLowerCase());
+    const key = JSON.stringify([date,...normalized]);
+    if (seen.has(key)) throw Error(`Duplicate ${[date,...dimensionValues].join(" / ")} at row ${rowNo}. Use daily totals or distinct roles and dayparts.`);
     seen.add(key); matchedDays.add(date); count++;
+    const groupKey = JSON.stringify(normalized);
+    let group;
+    if (dimensions.length) {
+      if (!groupTotals.has(groupKey)) groupTotals.set(groupKey,{
+        labels: Object.fromEntries(dimensions.map((dimension,index) => [dimension,dimensionValues[index]])),
+        dates: new Set(), sums: Object.fromEntries(mapped.map(field => [field,0])), missing: new Set(),
+      });
+      group = groupTotals.get(groupKey);
+      group.dates.add(date);
+    }
     for (const k of mapped) {
       const v = numeric(r[mapping[k]], k);
-      if (v === null) { missingCells.add(k); continue; }
+      if (v === null) { missingCells.add(k); group?.missing.add(k); continue; }
       if (!Number.isFinite(v) || Math.abs(v) > 1e10 || (!k.endsWith("sales") && v < 0)) throw Error("Invalid " + fieldNames[k] + " at row " + rowNo + ". Correct the source value.");
       sums[k] += v;
+      if (group) group.sums[k] += v;
     }
   }
   if (!count) throw Error("No rows match this location and fiscal week.");
@@ -165,5 +200,11 @@ export function aggregateReport({type, rows, headerIndex, mapping, selectedLocat
     totals[k] = !mapped.includes(k) || missingCells.has(k) || missingDays.length ? null : Math.round(sums[k] * 10000) / 10000;
   }
   if (missingDays.length) gaps.push("Missing dates: " + missingDays.join(", ") + ". Supply zero rows for verified closed days.");
-  return { totals, gaps, count, skipped, coverage: matchedDays.size };
+  if (groupTotals.size > 24) gaps.push("Role and daypart details are limited to 24 groups.");
+  if ([...groupTotals.values()].some(group => group.dates.size < 7)) gaps.push("Groups without seven dated rows omit weekly figures.");
+  const groups = [...groupTotals.entries()].sort(([a],[b]) => a.localeCompare(b,"en-US")).slice(0,24).map(([,group]) => ({
+    ...group.labels,
+    ...Object.fromEntries(mapped.flatMap(field => group.dates.size === 7 && !group.missing.has(field) ? [[field,Math.round(group.sums[field] * 10000) / 10000]] : [])),
+  }));
+  return { totals, gaps, groups, count, skipped, coverage: matchedDays.size };
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { aggregateReport, businessDate, guessMapping, parseDelimited, weekDates } from "../assets/labor-import-data.mjs";
+import { aggregateReport, businessDate, canArchiveReport, guessMapping, parseDelimited, weekDates } from "../assets/labor-import-data.mjs";
 
 const week = "2026-10-26";
 function input(type) {
@@ -24,12 +24,32 @@ test("three deidentified daily reports match the independent labor-variance fixt
 });
 test("scope excludes other locations and periods; same-day role duplicates fail explicitly", () => {
   const req=input("payroll");
+  assert.equal(canArchiveReport(req),true);
   req.rows.push([week,"Other café","Kitchen",999,9999],["2026-10-25","Juniper Café","Kitchen",99,999]);
   const data=aggregateReport(req);
   assert.equal(data.totals.actual_cost,2700);
   assert.equal(data.skipped,2);
+  assert.equal(canArchiveReport(req),false);
+  assert.equal(canArchiveReport({...req,mapping:{...req.mapping,location:-1}}),false);
   req.rows.push([...req.rows[1]]);
   assert.throws(()=>aggregateReport(req),/Duplicate 2026-10-26/);
+});
+test("role and daypart mappings retain supplied group values without filling partial groups", () => {
+  const req=input("payroll");
+  req.rows[0].push("Service Period");
+  for (const row of req.rows.slice(1)) row.push("Opening");
+  req.rows.push([week,"Juniper Café","Kitchen",3,60,"Closing"]);
+  req.mapping=guessMapping("payroll",req.rows[0]);
+  assert.equal(req.mapping.daypart,5);
+  const report=aggregateReport(req);
+  const closing=report.groups.find(group=>group.daypart==="Closing");
+  assert.deepEqual(closing,{role:"Kitchen",daypart:"Closing"});
+  const opening=report.groups.filter(group=>group.daypart==="Opening");
+  assert.equal(opening.reduce((sum,group)=>sum+group.actual_hours,0),135);
+  assert.equal(report.totals.actual_hours,138);
+  assert.match(report.gaps.join(" "),/Groups without seven dated rows/);
+  req.rows.push([week,"Juniper Café","Kitchen",2,40,"CLOSING"]);
+  assert.throws(()=>aggregateReport(req),/Duplicate.*Kitchen.*CLOSING/);
 });
 test("missing dates and missing fields cannot be mistaken for zero", () => {
   const req=input("sales");

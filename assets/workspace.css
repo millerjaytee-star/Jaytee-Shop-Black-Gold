@@ -99,3 +99,31 @@
 
 .stabilis-workspace .flow-step span { color: var(--muted); }
 .stabilis-workspace .context-controls span { color: var(--muted); }
+
+.diagnostic-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 18px;
+}
+
+.diagnostic-toolbar :is(input, button) { min-height: 44px; }
+.diagnostic-readout-content { overflow-wrap: anywhere; }
+.diagnostic-readout-content .card { margin-bottom: 16px; }
+.diagnostic-items { display: grid; gap: 14px; padding-left: 1.4rem; }
+.diagnostic-items h3, .diagnostic-items h4 { margin: 0 0 8px; }
+.diagnostic-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 8px 16px; }
+.diagnostic-facts div { padding-block: 4px; border-top: 1px solid var(--line); }
+.diagnostic-facts dt { color: var(--muted); }
+.diagnostic-facts dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; }
+.diagnostic-note { white-space: pre-wrap; }
+.diagnostic-stage { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 6px; }
+
+@media print {
+  .stabilis-workspace:has([data-diagnostic-readout]) :is(.sidebar, .app-topbar, .mobile-bar, .footer, .toast, .diagnostic-toolbar, .skip) { display: none !important; }
+  .stabilis-workspace:has([data-diagnostic-readout]) :is(.app-shell, .app-main, .app-content) { display: block; margin: 0; padding: 0; }
+  .diagnostic-readout-content :is(h2, h3, h4) { break-after: avoid; }
+  .diagnostic-readout-content .diagnostic-facts { break-inside: avoid; }
+  .diagnostic-readout-content a { color: black; }
+}

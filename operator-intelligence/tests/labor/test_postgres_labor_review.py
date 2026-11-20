@@ -15,6 +15,7 @@ import pytest
 
 HERE = Path(__file__).resolve().parent
 MIGRATION = HERE.parents[1] / "supabase/migrations/20261120220000_weekly_labor_review.sql"
+SOURCE_MIGRATION = MIGRATION.with_name("20261120231842_weekly_labor_source_archive.sql")
 WEEK = "2025-10-05"
 WEEK2 = "2025-10-12"
 INPUT = dict(
@@ -151,6 +152,7 @@ def db():
             instance = Database(bindir, port, password)
             instance.run((HERE / "foundation.sql").read_text())
             instance.run(MIGRATION.read_text())
+            instance.run(SOURCE_MIGRATION.read_text())
             instance.run(
                 f"insert into stabilis.organizations values ('{ORG}'),('{OTHER_ORG}');"
                 f"insert into stabilis.locations(id,organization_id) values ('{LOCATION}','{ORG}'),('{OTHER_LOCATION}','{ORG}'),"
@@ -419,3 +421,82 @@ def test_incomplete_week_and_non_iso_dates(db):
         error="Choose a completed fiscal week",
     )
     db.save(ANALYST, "create", {"week_start": "infinity", "inputs": INPUT, "source": "Invalid"}, error="YYYY-MM-DD")
+
+
+def test_weekly_private_source_storage_and_version_history(db):
+    week = "2025-06-01"
+    digest = "a" * 64
+    retained = "2099-01-01"
+
+    def prepare(actor, location=LOCATION, keep=retained):
+        return db.run(
+            f"select public.stabilis_prepare_weekly_source('{ORG}','{location}',"
+            f"'{week}','payroll.csv','{digest}',10,'{keep}');",
+            actor=actor,
+        )
+
+    entry = prepare(ANALYST)
+    assert not entry["archived"]
+    assert prepare(ANALYST) == entry
+    with pytest.raises(AssertionError, match="different signed retention"):
+        prepare(ANALYST, keep="2099-02-01")
+    with pytest.raises(AssertionError, match="Authorized analyst access required"):
+        prepare(OWNER)
+    path = literal(entry["path"])
+    file_id = literal(entry["id"])
+    insert = (
+        "insert into storage.objects(bucket_id,name,metadata) "
+        f"""values ('stabilis-raw',{path},'{{"size":10}}');"""
+    )
+    complete = f"select public.stabilis_finish_weekly_source('{ORG}','{LOCATION}',{file_id});"
+    count = f"select count(*) from storage.objects where name={path};"
+    db.run(complete, actor=ANALYST, error="could not be confirmed")
+    db.run(insert, actor=OWNER, error="row-level security")
+    db.run(insert, role="anon", error="row-level security")
+    db.run(insert, actor=ANALYST)
+    assert db.run(count, actor=ANALYST) == 0
+    db.run(complete, actor=ANALYST)
+    db.run(complete, actor=ANALYST)
+    assert prepare(ANALYST)["archived"]
+    assert db.run(count, actor=ANALYST) == 1
+    assert db.run(count, actor=OWNER) == db.run(count, actor=OUTSIDE) == db.run(count, role="anon") == 0
+    db.run(f"delete from storage.objects where name={path};", actor=ANALYST)
+    db.run(f"update storage.objects set metadata=null where name={path};", actor=ANALYST)
+    assert db.run(count, actor=ANALYST) == 1
+    assert db.run(f"select metadata->>'size'::text from storage.objects where name={path};", actor=ANALYST) == 10
+
+    report = {
+        "type": "payroll",
+        "filename": "payroll.csv",
+        "sha256": digest,
+        "sheet": "Report",
+        "header_row": 1,
+        "source_location": "Café",
+        "mapping": {"date": "Date", "role": "Job", "daypart": "Service", "actual_hours": "Hours", "actual_cost": "Cost"},
+        "totals": {"actual_hours": 135, "actual_cost": 2700},
+        "coverage": 7,
+        "row_count": 14,
+        "groups": [{"role": "Barista", "daypart": "Closing", "actual_hours": 60, "actual_cost": 1200}],
+        "gaps": [],
+        "archive_id": entry["id"],
+    }
+    payload = {"week_start": week, "inputs": INPUT, "source": "Mapped review report", "imports": [report]}
+    db.save(ANALYST, "create", payload, location=OTHER_LOCATION, error="authorized location and week")
+    db.save(ANALYST, "create", dict(payload, inputs=NEXT), error="does not match")
+    row = db.save(ANALYST, "create", payload)
+    history_query = f"select public.stabilis_weekly_source_history('{ORG}','{LOCATION}','{row['id']}');"
+    db.run(history_query, actor=OWNER, error="Source history unavailable")
+    db.run(history_query, actor=OUTSIDE, error="Source history unavailable")
+    db.run(history_query, role="anon", error="permission denied")
+    [initial] = db.run(history_query, actor=ANALYST)
+    assert initial["reports"][0]["groups"] == report["groups"]
+    assert initial["reports"][0]["archive"]["path"] == entry["path"]
+
+    corrected = db.save(ANALYST, "revise", {"week_start": week, "inputs": NEXT, "source": "Manual corrected report"}, row)
+    revisions = db.run(history_query, actor=ANALYST)
+    assert [record["version"] for record in revisions] == [2, 1]
+    assert revisions[0]["reports"] == [] and revisions[1]["reports"][0]["archive"]["path"] == entry["path"]
+    assert corrected["metrics"]["total_over"] == 0
+    db.run(f"update stabilis.weekly_labor_source_files set retain_through='2025-06-30' where id={file_id};")
+    assert db.run(count, actor=ANALYST) == 0
+    assert db.run(history_query, actor=ANALYST)[1]["reports"][0]["archive"]["path"] is None

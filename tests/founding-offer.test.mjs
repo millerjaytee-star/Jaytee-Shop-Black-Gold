@@ -30,7 +30,7 @@ test("pilot scope survives a website copy edit", () => {
     assert.match(html, /one[- ](?:agreed )?location/i, name);
   }
   const home = read("index.html");
-  assert.match(home, /<form\b[^>]*name="stabilis-pilot"[^>]*method="POST"[^>]*data-netlify="true"[^>]*action="\/thanks.html"/);
+  assert.match(home, /<form\b[^>]*name="stabilis-pilot"[^>]*method="POST"[^>]*data-netlify="true"[^>]*action="\/thanks"/);
   assert.match(home, /<option data-offer="range">3–15<\/option>/);
   assert.match(home, /after signed scope, cleared payment in full and minimum data readiness/);
   assert.match(read("profit-control-reset.html"), /agreed separately/i);

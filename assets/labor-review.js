@@ -1,3 +1,5 @@
+import {archiveWeeklySource, checkArchivedFile, showImportChoices, showSourceHistory, weeklySourcePayload} from './weekly-source-archive.js';
+
 const labels = {
   forecast_sales:'Forecast net sales ($)', actual_sales:'Actual net sales ($)', target_pct:'Labor target (%)',
   scheduled_hours:'Scheduled hours',actual_hours:'Actual paid hours',
@@ -21,7 +23,7 @@ function lines(items){return '<dl class="lr-lines">'+items.filter(([,v])=>v!=nul
 function inputsForm(values={}){
   return '<div class="lr-formgrid">'+Object.entries(labels).map(([key,title])=>field(key,title,values[key]??'','number',`step="any" min="0" ${key==='target_pct'?'max="100"':''}`)).join('')+'</div>';
 }
-function csvImport(){return '<button type="button" data-reconcile>Import sales, schedules and payroll</button><details class="lr-no-print"><summary>Fill from an aggregate CSV</summary><p class="lr-help">Use one location and one fiscal week per file. Select your export, inspect the populated fields and confirm below. Missing columns stay empty.</p><a href="/assets/labor-review-example.csv" download>Download the fictional CSV template</a><label class="lr-field">Weekly aggregate CSV<input type="file" data-csv accept=".csv,text/csv"></label><div data-import-status role="status" class="lr-help"></div></details>'}
+function csvImport(){return '<div data-mapped-sources></div><button type="button" data-reconcile>Import sales, schedules and payroll</button><details class="lr-no-print"><summary>Fill from an aggregate CSV</summary><p class="lr-help">Use one location and one fiscal week per file. Select your export, inspect the populated fields and confirm below. Missing columns stay empty.</p><a href="/assets/labor-review-example.csv" download>Download the fictional CSV template</a><label class="lr-field">Weekly aggregate CSV<input type="file" data-csv accept=".csv,text/csv"></label><div data-import-status role="status" class="lr-help"></div></details>'}
 function baselineEditor(adapter,review){
   const editing=Boolean(review);
   const correcting=editing&&review.status!=='draft';
@@ -155,6 +157,7 @@ export function parseWeeklyCSV(input){
   return data;
 }
 export async function mountLaborReview(root,adapter){
+  const importedForms=new WeakMap();
   let reviews=[],assignees=[],currentId=adapter.reviewId||'',creating=false,busy=false,message='',isError=false;
   root.classList.add('lr-root');
   root.innerHTML='<p role="status">Loading the weekly labor review…</p>';
@@ -180,7 +183,9 @@ export async function mountLaborReview(root,adapter){
       const editComparison=!demo&&(p.owner||p.analyst)&&r.status==='compared'?'<details class="lr-no-print"><summary>Correct the comparison</summary>'+comparisonEditor(r,adapter)+'</details>':'';
       const pending=r.action?.title?'':'<p class="lr-print-only">Action, owner and due date await approval.</p>';
       const action=`<div class="lr-stack">${section('Action and follow-through',actionInfo(r)+pending+overdue+actionForm(r,adapter,assignees)+editComparison+reopen+extra+history(r))}</div>`;
-      const analysis=`<div class="lr-stack">${breakdown(r)}${result(r,demo)}</div>`;
+      const sourceHistory=adapter.sourceHistory
+        ? section('Source records','<p>Inspect the source mappings and privately retained originals for this review.</p><button type="button" data-load-source-history>View source history</button><div data-source-history role="status"></div>'):'';
+      const analysis=`<div class="lr-stack">${breakdown(r)}${result(r,demo)}${sourceHistory?`<div class="lr-no-print">${sourceHistory}</div>`:''}</div>`;
       const actionFirst=p.gm&&r.action?.assignee_id===adapter.userId;
       detail=`<div class="lr-sectionhead lr-title"><div><p class="lr-kicker">${safe(adapter.location)}${demo?' · Fictional location':''}</p><h2 style="margin:0">Week of ${prettyDate(r.week_start)}</h2></div><span class="lr-status">${safe(statusNames[r.status]||r.status)}</span></div>
        <div class="lr-grid">${actionFirst?action+analysis:analysis+action}</div>`;
@@ -209,7 +214,42 @@ export async function mountLaborReview(root,adapter){
         b.disabled=true;
         try{
           const module=await import('/assets/labor-import.mjs');
-          await module.openLaborImport(form,{location:adapter.location,locationCode:adapter.locationCode});
+          await module.openLaborImport(form,{location:adapter.location,locationCode:adapter.locationCode,
+            onConfirm:adapter.demo?undefined:importPlan=>{
+              importedForms.set(form,importPlan);
+              showImportChoices(form.querySelector('[data-mapped-sources]'),{canArchive:Boolean(adapter.archiveSource),importPlan});
+            }});
+        }finally{b.disabled=false}
+      }
+      if(b.hasAttribute('data-discard-sources')){
+        const form=b.closest('form');
+        importedForms.delete(form);
+        form.querySelector('[data-mapped-sources]').replaceChildren();
+        form.querySelector('[data-reconcile]').focus();
+      }
+      if(b.hasAttribute('data-load-source-history')){
+        const historyBox=root.querySelector('[data-source-history]');
+        b.disabled=true;
+        historyBox.textContent='Loading source history…';
+        try{
+          const sourceRecords=await adapter.sourceHistory(active().id);
+          showSourceHistory(historyBox,sourceRecords);
+          historyBox.querySelector('button')?.focus();
+        }catch(error){
+          historyBox.textContent='Source history is unavailable. Refresh and try again.';
+          throw error;
+        }finally{b.disabled=false}
+      }
+      if(b.hasAttribute('data-download-source')){
+        b.disabled=true;
+        try{
+          const blob=await adapter.downloadSource(b.dataset.downloadSource);
+          await checkArchivedFile(blob,b.dataset.sourceSha256);
+          const url=URL.createObjectURL(blob);
+          const link=document.createElement('a');
+          link.href=url;link.download=b.dataset.sourceFilename;
+          document.body.append(link);link.click();link.remove();
+          setTimeout(()=>URL.revokeObjectURL(url),1000);
         }finally{b.disabled=false}
       }
       if(b.hasAttribute('data-print'))window.print();
@@ -223,10 +263,18 @@ export async function mountLaborReview(root,adapter){
     try{
       if(t.name==='demo-role')await switchRole(t.value,'[name=demo-role]');
       if(t.name==='review-id'){selectReview(t.value);creating=false;message='';isError=false;render();focus('[name=review-id]')}
+      if(t.hasAttribute('data-archive-sources')){
+        const retention=t.closest('form').querySelector('[data-retain-through]');
+        retention.disabled=!t.checked;
+        retention.required=t.checked;
+        if(t.checked)retention.focus();
+      }
       if(t.hasAttribute('data-csv')&&t.files.length){
         if(t.files[0].size>256000)throw Error('Choose a one-week summary CSV under 250 KB.');
         const d=parseWeeklyCSV(await t.files[0].text()),f=t.closest('form');
         if(f.elements.week_start.readOnly&&d.week_start&&d.week_start!==f.elements.week_start.value)throw Error('The source week does not match this draft.');
+        importedForms.delete(f);
+        f.querySelector('[data-mapped-sources]').replaceChildren();
         for(const k of Object.keys(labels))f.elements[k].value=d[k]??'';
         if(d.week_start&&!f.elements.week_start.readOnly)f.elements.week_start.value=d.week_start;
         f.elements.source.value=d.source||t.files[0].name;
@@ -247,6 +295,11 @@ export async function mountLaborReview(root,adapter){
           payload={week_start:data.week_start,source:data.source,inputs:readInputs(fd)};
           if(op==='correct')payload.note=data.note;
           if(op==='compare'){payload.note=data.note;payload.comparable=data.comparable==='yes'}
+          const importPlan=importedForms.get(f);
+          if(op==='create'&&importPlan&&reviews.some(review=>review.week_start===data.week_start)){
+            throw Error('A review already exists for this fiscal week. Open it to correct the source mapping.');
+          }
+          if(importPlan)payload.imports=await weeklySourcePayload({form:f,importPlan,payload,adapter});
         }
         if(op==='assign'){payload.assignee_name=assignees.find(a=>a.id===data.assignee_id)?.name||'';if(data.next_review<data.due_date)throw Error('The next review must be on or after the due date.')}
         if(op==='verify')payload.amount=Number(data.amount);
@@ -271,7 +324,13 @@ export function openAuthenticatedReview(root,context){
     assignees:()=>context.rpc('stabilis_labor_assignees',p),
     enroll:name=>context.rpc('stabilis_enroll_labor_assignee',{...p,p_name:name}),
     save:(id,version,operation,payload)=>context.rpc('stabilis_save_labor_review',{...p,p_review_id:id,p_version:version,p_operation:operation,p_payload:payload})};
-  const intake=permission(context.role).analyst?'<p>The review stores the confirmed weekly figures and source references. Use <a href="#data">Data Quality &amp; Connections</a> to archive raw exports privately when the signed scope allows it. Add the file reference to the review.</p>':'';
+  const analyst=permission(context.role).analyst;
+  if(analyst&&context.storage){
+    adapter.archiveSource=(file,report,week,retainThrough)=>archiveWeeklySource({rpc:context.rpc,storage:context.storage,scope:p,file,report,week,retainThrough});
+    adapter.downloadSource=async path=>(await context.storage(path)).blob();
+    adapter.sourceHistory=id=>context.rpc('stabilis_weekly_source_history',{...p,p_review_id:id});
+  }
+  const intake=analyst?'<p>Confirm the mapped figures before saving. When the signed scope permits it, a source import can retain the deidentified originals in the private location archive.</p>':'';
   root.innerHTML='<div class="lr-app"><div class="lr-intro"><p>Stabilis Operator Intelligence™</p><h1>Weekly labor review</h1><div>Review the location’s records, agree on an action and compare the following week.</div>'+intake+'</div><div data-labor-private></div></div>';
   return mountLaborReview(root.querySelector('[data-labor-private]'),adapter);
 }

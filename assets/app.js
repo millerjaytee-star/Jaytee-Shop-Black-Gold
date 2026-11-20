@@ -68,7 +68,7 @@ function diagnosticReview(){
     `<div class="app-grid">${card('Weekly labor release queue',reviewList('diagnostic-labor',record=>record.status==='draft',()=> 'Awaiting analyst release')+'<p><a href="#labor-review">Open weekly labor review</a></p>')}
     ${card('Inventory and waste evidence',recordEvidence,6)}
     ${card('Shared inventory notes',table(['Date','Location','Evidence summary'],inventoryNotes,'No inventory notes recorded'),6)}
-    ${card('Diagnostic readout','<p>Use supported non-overlapping opportunity estimates and up to five owned actions in the diagnostic readout and 90-day roadmap.</p><a href="#reports">View released reports</a>')}</div>`;
+    ${card('Diagnostic readout','<p>Review the released evidence and approved actions for this location, then print the readout and 90-day roadmap.</p><a href="#diagnostic-readout">Open diagnostic readout</a>')}</div>`;
 }
 function mappingReview(){
   const rows = (P.data_quality_issues || []).map(issue=>`<tr><td>${esc(issue.location_code || 'Enterprise')}</td><td>${esc(issue.period || '—')}</td><td>${esc(issue.description)}</td><td>${esc(issue.source || '—')}</td><td>${esc(issue.status)}</td></tr>`);
@@ -115,7 +115,30 @@ document.addEventListener('submit',async event=>{
     if (form.isConnected) button.disabled = false;
   }
 });
-function reports(){return generic('Reports','Only authorized released reports are customer-visible.',P.reports.map(r=>`<tr><td>${esc(r.period||'—')}</td><td>${r.version}</td><td>${esc(r.release_status)}</td><td>${esc(r.generated_at)}</td></tr>`),['Period','Version','State','Generated'])}function alerts(){return generic('Alert Center','Evidence-based operating alerts.',P.alerts.map(a=>`<tr><td>${esc(a.location_code||'Enterprise')}</td><td>${esc(a.rule_type)}</td><td>${esc(a.urgency||'—')}</td><td>${esc(a.status)}</td></tr>`),['Location','Type','Urgency','State'])}function admin(){return head('Administration','Organization Controls','Role-based tenant configuration.',badge(P.context.role))+`<div class="data-state">${state('Organization',P.context.organization_name)}${state('Role',P.context.role)}${state('Locations',P.locations.length)}${state('Pilot',P.pilot?.pilot_status||'Not configured')}</div>`}function placeholder(name){return head(name,name,'Workspace uses the same authorized tenant payload.')+`<div class="app-grid">${card(name,'<div class="empty"><strong>Not enough data</strong><br>Additional authorized source detail is required for this view.</div>',12)}</div>`}const routes={command,locations,forecast,opportunities:opps,actions,results,reports,alerts,data,notes,onboarding,intelligence,analyst,admin,labor:()=>placeholder('Labor Intelligence'),inventory:()=>placeholder('Inventory Intelligence'),purchasing:()=>placeholder('Purchasing Intelligence'),food:()=>placeholder('Food Cost Intelligence'),revenue:()=>placeholder('Revenue Intelligence'),'diagnostic-review':diagnosticReview,'mapping-review':mappingReview,'verification-review':verificationReview,'customer-admin':customerAdministration};function toast(m,e=false){let t=$('#toast');t.textContent=m;t.style.borderColor=e?'#764747':'#3f6550';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)}const recordIdPattern='[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}';
+function diagnosticReadout(){
+  const selected = locs.find(location => location.id === loc.value && location.organization_id === org.value);
+  const header = head('Reports','14-Day Margin Recovery Diagnostic','Review the released labor findings, shared inventory evidence and approved actions for one location.');
+  if (!selected) return header+card('Select a location','<p>Choose the agreed location in the workspace toolbar to open its diagnostic readout.</p>');
+  const view = {rpc,organizationId:org.value,locationId:selected.id,locationName:selected.name,notes:P.operator_notes || []};
+  queueMicrotask(async () => {
+    const host = document.querySelector('[data-diagnostic-readout]');
+    if (!host) return;
+    try {
+      const module = await import('/assets/diagnostic-readout.js');
+      if (host.isConnected) await module.openDiagnosticReadout(host,view);
+    } catch {
+      if (host.isConnected) host.innerHTML = '<p role="alert">The diagnostic readout could not open. Refresh and try again.</p>';
+    }
+  });
+  return header+'<section data-diagnostic-readout aria-label="Diagnostic readout"><p role="status">Opening the diagnostic readout…</p></section>';
+}
+function reports(){
+  const rows = (P.reports || []).map(record=>`<tr><td>${esc(record.period || '—')}</td><td>${esc(record.version)}</td><td>${esc(record.release_status)}</td><td>${esc(record.generated_at)}</td></tr>`);
+  return head('Reports','Reports','This workspace shows released reports and the diagnostic readout for the selected location.')+
+    `<div class="app-grid">${card('Diagnostic readout and roadmap','<p>Open the current readout assembled from released findings and approved actions.</p><a href="#diagnostic-readout">Open diagnostic readout</a>')}
+    ${card('Released report versions',table(['Period','Version','State','Generated'],rows,'No released reports'))}</div>`;
+}
+function alerts(){return generic('Alert Center','Evidence-based operating alerts.',P.alerts.map(a=>`<tr><td>${esc(a.location_code||'Enterprise')}</td><td>${esc(a.rule_type)}</td><td>${esc(a.urgency||'—')}</td><td>${esc(a.status)}</td></tr>`),['Location','Type','Urgency','State'])}function admin(){return head('Administration','Organization Controls','Role-based tenant configuration.',badge(P.context.role))+`<div class="data-state">${state('Organization',P.context.organization_name)}${state('Role',P.context.role)}${state('Locations',P.locations.length)}${state('Pilot',P.pilot?.pilot_status||'Not configured')}</div>`}function placeholder(name){return head(name,name,'Workspace uses the same authorized tenant payload.')+`<div class="app-grid">${card(name,'<div class="empty"><strong>Not enough data</strong><br>Additional authorized source detail is required for this view.</div>',12)}</div>`}const routes={command,locations,forecast,opportunities:opps,actions,results,reports,'diagnostic-readout':diagnosticReadout,alerts,data,notes,onboarding,intelligence,analyst,admin,labor:()=>placeholder('Labor Intelligence'),inventory:()=>placeholder('Inventory Intelligence'),purchasing:()=>placeholder('Purchasing Intelligence'),food:()=>placeholder('Food Cost Intelligence'),revenue:()=>placeholder('Revenue Intelligence'),'diagnostic-review':diagnosticReview,'mapping-review':mappingReview,'verification-review':verificationReview,'customer-admin':customerAdministration};function toast(m,e=false){let t=$('#toast');t.textContent=m;t.style.borderColor=e?'#764747':'#3f6550';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)}const recordIdPattern='[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}';
 const reviewRoutePattern=new RegExp('^labor-review(?:/('+recordIdPattern+')/('+recordIdPattern+'))?$','i');
 function linkedLaborReview(){return reviewRoutePattern.exec(location.hash.slice(1));}
 function reviewLogin(){const route=linkedLaborReview();return route?'/login?view='+encodeURIComponent(route[0]):'/login';}
@@ -129,17 +152,28 @@ function syncReviewLocation(){
 function clearReviewLink(){
   if(linkedLaborReview()?.[1])history.replaceState(null,'','#labor-review');
 }
+async function weeklySourceStorage(path,{method='GET',body}={}){
+  const access=await token();
+  if(!access)throw Error('Sign in again to open private sources.');
+  const encoded=path.split('/').map(encodeURIComponent).join('/');
+  const objectPath=method==='GET'?'authenticated/stabilis-raw/':'stabilis-raw/';
+  const headers={apikey:cfg.supabasePublishableKey,Authorization:'Bearer '+access};
+  if(body){headers['Content-Type']=body.type||'application/octet-stream';headers['x-upsert']='false';}
+  const response=await fetch(cfg.supabaseUrl+'/storage/v1/object/'+objectPath+encoded,{method,headers,body});
+  if(!response.ok)throw Error('Private source storage is unavailable. Check the archive permission or retry the upload.');
+  return response;
+}
 function render(){let h=(location.hash||'#command').slice(1);const review=linkedLaborReview();if(review){
   const host=document.createElement('div');
   W.replaceChildren(host);
   const selected=locs.find(item=>item.id===loc.value);
   const view={orgId:org.value,locationId:loc.value,location:selected?.name||'',locationCode:selected?.code||'',
-    role:orgs.find(item=>item.id===org.value)?.role,userId:currentUserId,rpc,reviewId:review[2]?.toLowerCase(),
+    role:orgs.find(item=>item.id===org.value)?.role,userId:currentUserId,rpc,storage:weeklySourceStorage,reviewId:review[2]?.toLowerCase(),
     unavailable:Boolean(review[1]&&review[1].toLowerCase()!==loc.value)};
   document.querySelectorAll('.side-nav a').forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#labor-review'));
   import('/assets/labor-review.js').then(m=>{if(host.isConnected)m.openAuthenticatedReview(host,view)}).catch(()=>{if(host.isConnected)host.textContent='Unable to load the weekly labor review. Refresh and try again.'});
   return;
-}W.innerHTML=h.startsWith('location/')?locationDetail(h.split('/')[1]):(routes[h]||command)();document.querySelectorAll('.side-nav a').forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+h||(h.startsWith('location/')&&a.getAttribute('href')==='#locations')));if(['command','results','opportunities'].includes(h)){const heading=W.querySelector('.page-head');if(heading){const link=document.createElement('a');link.href='#labor-review';link.className='btn sm';link.textContent='View weekly labor evidence';heading.append(link);
+}W.innerHTML=h.startsWith('location/')?locationDetail(h.split('/')[1]):(routes[h]||command)();document.querySelectorAll('.side-nav a').forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+h||(h.startsWith('location/')&&a.getAttribute('href')==='#locations')||(h==='diagnostic-readout'&&a.getAttribute('href')==='#reports')));if(['command','results','opportunities'].includes(h)){const heading=W.querySelector('.page-head');if(heading){const link=document.createElement('a');link.href='#labor-review';link.className='btn sm';link.textContent='View weekly labor evidence';heading.append(link);
   if(h==='results'){
     const selection={rpc,orgId:org.value,locationId:loc.value};
     import('/assets/labor-review.js').then(module=>module.linkLatestLaborReview(link,selection)).catch(()=>{});

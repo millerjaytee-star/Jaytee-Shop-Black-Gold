@@ -6,8 +6,11 @@
 /app  /app.html  200
 /security  /security.html  200
 /privacy  /privacy.html  200
+/support  /support.html  200
+/support-received  /support-received.html  200
 /terms  /terms.html  200
 /control-room  /control-room.html  200
 
 /proof-ledger  /proof-ledger.html  200
 /labor-review  /labor-review.html  200
+/mobile/review/*  /mobile-review.html  200

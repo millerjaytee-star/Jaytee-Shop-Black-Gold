@@ -3,6 +3,16 @@ create schema stabilis;
 create schema auth;
 create role authenticated;
 create role anon;
+create schema storage;
+create table storage.buckets(id text primary key, public boolean not null);
+create table storage.objects(bucket_id text references storage.buckets(id), name text, metadata jsonb, contents bytea,
+  primary key (bucket_id,name));
+insert into storage.buckets values ('stabilis-raw',false);
+alter table storage.objects enable row level security;
+grant usage on schema storage to anon,authenticated;
+grant select,insert,update,delete on storage.objects to anon,authenticated;
+-- An old tenant-wide permissive policy may still cover the new object paths.
+create policy fixture_legacy_storage on storage.objects for all using (true) with check (true);
 create function auth.uid() returns uuid language sql stable as
   $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
 create table stabilis.organizations(id uuid primary key);

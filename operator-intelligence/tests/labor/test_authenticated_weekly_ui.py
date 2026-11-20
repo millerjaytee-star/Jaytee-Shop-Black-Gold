@@ -5,6 +5,7 @@ Supabase auth/REST transport and existing workspace bootstrap are replaced local
 Set STABILIS_BROWSER_EXECUTABLE to select a system Chromium when needed.
 """
 
+from base64 import b64decode
 from functools import partial
 from http.server import ThreadingHTTPServer
 import json
@@ -12,7 +13,7 @@ import os
 from pathlib import Path
 import sys
 from threading import Thread
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 from playwright.sync_api import expect, sync_playwright
 import pytest
@@ -49,6 +50,11 @@ RPC_ARGS = {
     "stabilis_enroll_labor_assignee": ("p_organization_id", "p_location_id", "p_name"),
     "stabilis_labor_assignees": ("p_organization_id", "p_location_id"),
     "stabilis_labor_reviews": ("p_organization_id", "p_location_id"),
+    "stabilis_prepare_weekly_source": (
+        "p_organization_id", "p_location_id", "p_week_start", "p_filename", "p_sha256", "p_size_bytes", "p_retain_through"
+    ),
+    "stabilis_finish_weekly_source": ("p_organization_id", "p_location_id", "p_source_id"),
+    "stabilis_weekly_source_history": ("p_organization_id", "p_location_id", "p_review_id"),
     "stabilis_save_labor_review": (
         "p_organization_id",
         "p_location_id",
@@ -76,6 +82,25 @@ def browser_transport(route, address, database):
         return route.continue_()
     name = request.headers.get("authorization", "").removeprefix("Bearer synthetic-")
     action = url.path.removeprefix("/db/")
+    if action.startswith("storage/v1/object/") and name in USERS:
+        actor, _ = USERS[name]
+        path = literal(unquote(action.split("stabilis-raw/", 1)[1]))
+        try:
+            if request.method == "POST":
+                content = request.post_data_buffer
+                assert content is not None
+                database.run(
+                    "insert into storage.objects(bucket_id,name,metadata,contents) values ("
+                    f"'stabilis-raw',{path},jsonb_build_object('size',{len(content)}),decode('{content.hex()}','hex'));",
+                    actor=actor,
+                )
+                return route.fulfill(status=200, json={"stored": True})
+            encoded = database.run(
+                f"select to_json(encode(contents,'base64')) from storage.objects where name={path};", actor=actor
+            )
+            return route.fulfill(status=200, body=b64decode(encoded)) if encoded else route.fulfill(status=404)
+        except AssertionError as exc:
+            return route.fulfill(status=400, json={"message": str(exc).splitlines()[0]})
     values = request.post_data_json or {}
     if action == "auth/v1/token":
         name = values.get("email", "").split("@")[0]
@@ -215,12 +240,24 @@ def test_private_weekly_cycle(db, local_site):
                 expect(report.locator("[data-location-value]")).to_have_value("Juniper Café")
             analyst.locator("[data-preview]").click()
             analyst.locator("[data-apply]").click()
+            archive = baseline.get_by_role("checkbox", name="Archive the deidentified originals privately")
+            expect(archive).not_to_be_checked()
+            archive.check()
+            baseline.get_by_label("Signed retention end date").fill("2099-01-01")
             expect(baseline.locator('[name="actual_cost"]')).to_have_value("2700")
             baseline.locator('[name="target_pct"]').fill("25")
             operation(analyst, "create")
             expect(analyst.locator(".lr-big")).to_have_text("$450")
             expect(analyst.get_by_text("$250", exact=True)).to_be_visible()
             expect(analyst.get_by_text("$200", exact=True)).to_be_visible()
+            analyst.get_by_role("button", name="View source history").click()
+            downloads = analyst.get_by_role("button", name="Download private original")
+            expect(downloads).to_have_count(3)
+            with analyst.expect_download() as download_info:
+                downloads.first.click()
+            source = download_info.value
+            assert source.suggested_filename == "sales.csv"
+            assert source.path().read_bytes() == (ROOT / "assets/labor-examples/sales.csv").read_bytes()
             refresh(owner)
             expect(owner.get_by_text("Week of Oct 26, 2026")).to_have_count(0)
             review_view = analyst.url.split("#", 1)[1]
@@ -242,6 +279,7 @@ def test_private_weekly_cycle(db, local_site):
                 },
             )
             expect(owner.locator(".lr-message")).to_have_text("Action assigned.")
+            expect(owner.get_by_role("button", name="View source history")).to_have_count(0)
             gm.context.close()
             gm = enter("gm", review_view)
             othergm = enter("othergm", review_view)

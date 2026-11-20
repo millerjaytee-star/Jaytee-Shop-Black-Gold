@@ -1,12 +1,15 @@
-import { reportTypes, fieldNames, fieldsFor, guessMapping, parseDelimited, aggregateReport, weekDates } from "./labor-import-data.mjs";
+import { reportTypes, fieldNames, fieldsFor, guessMapping, parseDelimited, aggregateReport, canArchiveReport, weekDates } from "./labor-import-data.mjs";
 
 const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[char]);
 function options(items, picked) {
   return items.map(([value, label]) => `<option value="${esc(value)}"${String(value) === String(picked) ? " selected" : ""}>${esc(label)}</option>`).join("");
 }
 function short(value, length) {
-  const cleaned = String(value).replace(/[\r\n;]+/g, " ").trim();
+  const cleaned = String(value).replace(/[\u0000-\u001f\u007f;]+/g, " ").trim();
   return cleaned.length > length ? cleaned.slice(0, length - 1) + "…" : cleaned;
+}
+function metadata(value, length) {
+  return String(value).replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0,length);
 }
 async function workbook(file) {
   if (file.size > 5 * 1024 * 1024) throw Error("Choose an export under 5 MiB.");
@@ -19,7 +22,7 @@ async function workbook(file) {
   return { names: ["Delimited report"], rows: async () => rows };
 }
 
-export function openLaborImport(form, { location = "", locationCode = "" } = {}) {
+export function openLaborImport(form, { location = "", locationCode = "", onConfirm } = {}) {
   const types = Object.keys(reportTypes);
   const state = {};
   const versions = {};
@@ -36,7 +39,7 @@ export function openLaborImport(form, { location = "", locationCode = "" } = {})
   dialog.innerHTML = `
     <header><h2 id="labor-import-title">Import daily operating reports</h2>
       <button type="button" data-close aria-label="Close import">Close</button></header>
-    <p>Choose deidentified daily totals for one location. Use one sales row per date and one labor row per date or role. Files are read on this device. Confirmed weekly figures and source references enter your review when you save it.</p>
+    <p>Choose deidentified daily totals for one location. Use one sales row per date and one labor row per date, role or daypart. Files are read on this device. Confirmed weekly figures and source references enter your review when you save it.</p>
     <details><summary>Download fictional examples</summary>
       <p>Juniper Café · week starting October 26, 2026. Use a 25% labor target.</p>
       <p><a download href="/assets/labor-examples/sales.csv">Sales CSV</a> · <a download href="/assets/labor-examples/schedule.csv">Schedule CSV</a> · <a download href="/assets/labor-examples/payroll.csv">Payroll CSV</a> · <a download href="/assets/labor-examples/weekly-reports.xlsx">Excel workbook (three sheets)</a></p><p>For Excel, choose the same workbook for each report and select Sales, Schedule or Payroll.</p>
@@ -135,8 +138,8 @@ export function openLaborImport(form, { location = "", locationCode = "" } = {})
       const bytes = await file.arrayBuffer();
       const digest = globalThis.crypto?.subtle ? new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)) : null;
       if (serial !== versions[type]) return;
-      const ref = digest ? [...digest.slice(0,8)].map(v => v.toString(16).padStart(2,"0")).join("") : "";
-      state[type] = {file,book,ref};
+      const sha256 = digest ? [...digest].map(v => v.toString(16).padStart(2,"0")).join("") : null;
+      state[type] = {file,book,sha256};
       part.querySelector("[data-mapping]").innerHTML = `<div class="li-fields">
         <label>Worksheet<select data-sheet>${options(book.names.map(n => [n,n]),book.names[0])}</select></label>
         <label>Header row<select data-header></select></label></div>
@@ -189,9 +192,16 @@ export function openLaborImport(form, { location = "", locationCode = "" } = {})
       try { result = aggregateReport({ type, rows:s.rows, headerIndex:s.headerIndex, mapping, selectedLocation, singleLocation, week, date1904:s.book.date1904 }); }
       catch (error) { throw Error(reportTypes[type].name + ": " + error.message); }
       const headers = s.rows[s.headerIndex];
-      const fieldMap = Object.entries(mapping).filter(([,i])=>i>=0).map(([k,i])=>k+"="+short(headers[i],17)).join(", ");
-      source.push(`${type}: ${short(s.file.name,38)}${s.ref ? " ["+s.ref+"]" : ""} / ${short(s.sheet,16)} r${s.headerIndex + 1}; ${short(selectedLocation || loc,22)}; ${result.count} rows (${result.coverage}/7d); ${fieldMap}`);
-      entries.push({type,result}); Object.assign(totals,result.totals);
+      const confirmedFields = Object.entries(mapping).filter(([,i])=>i>=0).map(([k,i])=>[k,metadata(headers[i],120)]);
+      const fieldMap = confirmedFields.map(([k,label])=>k+"="+short(label,17)).join(", ");
+      source.push(`${type}: ${short(s.file.name,38)}${s.sha256 ? " ["+s.sha256.slice(0,16)+"]" : ""} / ${short(s.sheet,16)} r${s.headerIndex + 1}; ${short(selectedLocation || loc,22)}; ${result.count} rows (${result.coverage}/7d); ${fieldMap}`);
+      const extension=s.file.name.slice(s.file.name.lastIndexOf("."));
+      const filename=metadata(s.file.name.slice(0,-extension.length),180-extension.length)+extension;
+      const report={type,file:s.file,filename,sha256:s.sha256,sheet:metadata(s.sheet,100),
+        header_row:s.headerIndex+1,source_location:metadata(selectedLocation||loc,100),mapping:Object.fromEntries(confirmedFields),
+        totals:result.totals,coverage:result.coverage,row_count:result.count,groups:result.groups,
+        gaps:result.gaps.slice(0,8).map(gap=>metadata(gap,140)),archiveEligible:canArchiveReport({rows:s.rows,headerIndex:s.headerIndex,mapping,selectedLocation})};
+      entries.push({type,result,report}); Object.assign(totals,result.totals);
     }
     if (!entries.length) throw Error("Select at least one report.");
     if (!Object.values(totals).some(v => v != null)) throw Error("No complete weekly figures yet. "+entries.map(({type,result})=>reportTypes[type].name+": "+result.gaps.join(". ")).join(" "));
@@ -199,7 +209,13 @@ export function openLaborImport(form, { location = "", locationCode = "" } = {})
     if (omitted.length) source.push("Reports not supplied: " + omitted.join(", "));
     const reference = source.join("\n");
     if (reference.length > form.elements.source.maxLength && form.elements.source.maxLength !== -1) throw Error("Source references exceed the review field limit. Shorten file names or column headers and try again.");
-    return {week,loc,totals,entries,omitted,reference};
+    const reports = entries.map(({type,report}) => {
+      const sameFile=entries.filter(entry=>entry.report.sha256===report.sha256);
+      const archiveEligible=Boolean(report.sha256)&&sameFile.every(entry=>entry.report.archiveEligible)&&
+        state[type].book.names.every(sheet=>sameFile.some(entry=>state[entry.type].sheet===sheet));
+      return {...report,archiveEligible};
+    });
+    return {week,loc,totals,entries,reports,omitted,reference};
   }
   function showPreview() {
     const data = prepare();
@@ -232,6 +248,7 @@ export function openLaborImport(form, { location = "", locationCode = "" } = {})
         for (const {fields} of Object.values(reportTypes)) for (const key of fields) form.elements[key].value = preview.totals[key] ?? "";
         form.elements.week_start.value = preview.week;
         form.elements.source.value = preview.reference;
+        onConfirm?.({week:preview.week,totals:preview.totals,reports:preview.reports});
         const status = form.querySelector("[data-import-status]");
         if (status) status.textContent = "Daily reports reconciled. Check the weekly figures, labor target and source references before saving.";
         close();

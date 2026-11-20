@@ -55,13 +55,22 @@ def test_public_trust_and_legal_pages_exist():
     security=text('security.html').lower();privacy=text('privacy.html').lower();terms=text('terms.html')
     assert 'row level security' in security
     assert 'source, report and evidence' in security
-    assert 'tenant-scoped' in privacy
+    assert 'organization and location grants' in privacy and 'keychain' in privacy
+    assert 'href="/support#account-deletion"' in privacy
     assert 'Modeled opportunity is not verified savings' in terms
     assert '$392,570.56' in terms and 'fictional' in terms.lower()
 
+def test_support_request_uses_separate_static_capture_and_receipt():
+    support=text('support.html');receipt=text('support-received.html')
+    assert 'name="stabilis-support" action="/support-received" method="POST" data-netlify="true"' in support
+    assert 'name="form-name" value="stabilis-support"' in support
+    assert 'id="account-deletion"' in support and 'value="account-deletion"' in support
+    assert 'Support request received' in receipt and 'identity verification' in receipt
+
 def test_netlify_security_and_clean_routes():
     redirects=text('_redirects');toml=text('netlify.toml')
-    for route in ['/operator-intelligence','/operator-intelligence-report','/login','/app','/security','/privacy','/terms']:
+    for route in ['/operator-intelligence','/operator-intelligence-report','/login','/app',
+                  '/security','/privacy','/support','/support-received','/terms']:
         assert route in redirects
     for header in ['Content-Security-Policy','Strict-Transport-Security','X-Content-Type-Options','X-Robots-Tag']:
         assert header in toml
