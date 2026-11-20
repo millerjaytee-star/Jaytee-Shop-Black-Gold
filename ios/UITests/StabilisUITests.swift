@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 final class StabilisUITests: XCTestCase {
     private var app: XCUIApplication!
@@ -40,6 +41,26 @@ final class StabilisUITests: XCTestCase {
         capture("02 Fictional labor variance")
     }
 
+    func testFictionalVarianceRemainsReadableAtLargestTextSize() {
+        openFreshFictionalReview()
+        let total = control("review.historicalVariance")
+        reveal(total)
+        XCTAssertTrue(total.isHittable)
+        let defaultHeight = total.frame.height
+
+        app.terminate()
+        app.launchArguments += ["-UIPreferredContentSizeCategoryName", UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue]
+        app.launch()
+        tap("demo.open")
+        tap("demo.review")
+        reveal(total)
+        XCTAssertTrue(total.isHittable)
+        XCTAssertGreaterThan(total.frame.height, defaultHeight)
+        requireText("$450")
+        requireText("Historical variance")
+        capture("06 Fictional variance with largest accessibility text")
+    }
+
     func testFictionalActionAndComparisonPersistAfterRelaunch() {
         openFreshFictionalReview()
 
@@ -57,9 +78,9 @@ final class StabilisUITests: XCTestCase {
         let evidence = control("review.evidenceNote")
         reveal(evidence)
         XCTAssertTrue(evidence.isHittable)
-        capture("04 Fictional completion evidence")
         evidence.tap()
         evidence.typeText("Reviewed seven closing shifts against schedule.")
+        capture("04 Fictional completion evidence")
         tap("review.submitEvidence")
 
         selectDemoRole("Owner")
@@ -79,6 +100,12 @@ final class StabilisUITests: XCTestCase {
         tap("demo.open")
         tap("demo.review")
         requireObservedChange()
+
+        tap("review.shareSummary")
+        let copy = app.buttons["Copy"].firstMatch
+        let save = app.buttons["Save to Files"].firstMatch
+        XCTAssertTrue(copy.waitForExistence(timeout: 5) || save.waitForExistence(timeout: 5), "Expected the native share sheet to offer an export action.")
+        capture("07 Native PDF share sheet")
     }
 
     private func openFreshFictionalReview() {

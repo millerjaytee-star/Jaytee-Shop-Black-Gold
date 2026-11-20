@@ -15,6 +15,8 @@ Initial real-customer work runs in **SHADOW MODE**.
 
 Pilot success is evaluated separately from customer financial performance using onboarding completion, time-to-first-diagnostic, opportunity acceptance, action creation/completion, analyst review time, login/return frequency, report usage and verified-value conversion.
 
+Use the [pilot release rehearsal](pilot-release-rehearsal.md) for the synthetic reviewer walkthrough, operator session script, private measurement schema and signed delivery record.
+
 ## First-month research plan
 
 | Week | Target | Record as an actual result |

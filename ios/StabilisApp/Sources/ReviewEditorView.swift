@@ -73,8 +73,6 @@ struct ReviewEditorView: View {
         let exampleNote: String
         if editor == .compare {
             exampleNote = "Same operating hours and wage rates across both fictional weeks."
-        } else if editor == .evidence {
-            exampleNote = "Compared the closing schedule against paid time records for all seven days."
         } else {
             exampleNote = ""
         }
@@ -172,7 +170,11 @@ struct ReviewEditorView: View {
         } header: {
             Text(noteLabel)
         } footer: {
-            Text("Cite a report, shift record or observation the reviewer can check.")
+            if editor == .evidence, store.isDemo {
+                Text("Fictional example: Compared the closing schedule against paid time records for all seven days.")
+            } else {
+                Text("Cite a report, shift record or observation the reviewer can check.")
+            }
         }
     }
 

@@ -7,5 +7,7 @@ CURRENT_PROJECT_VERSION = 1
 CODE_SIGN_STYLE = Automatic
 STABILIS_SUPABASE_URL =
 STABILIS_SUPABASE_PUBLISHABLE_KEY =
+STABILIS_WEB_ORIGIN = https:/$()/stabilis-ops-group.netlify.app
+STABILIS_ASSOCIATED_DOMAIN = stabilis-ops-group.netlify.app
 STABILIS_RECOVERY_URL =
 #include? "Local.xcconfig"

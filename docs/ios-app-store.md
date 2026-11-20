@@ -75,6 +75,19 @@ For an Unlisted request, add that the audience is invited restaurant managers an
 
 Before verifying link handoff on-device, enable Associated Domains for the signed App ID. Serve `/.well-known/apple-app-site-association` at the authorized host over HTTPS with the actual application identifier prefix and bundle ID, the review path and an HTTP 200 without a redirect. Test a review link from Messages or Notes with the app installed and validate the browser fallback with the app removed. Confirm both destinations still require authorized access to client records. [Associated domains](https://developer.apple.com/documentation/xcode/supporting-associated-domains) · [Universal link diagnostics](https://developer.apple.com/documentation/technotes/tn3155-debugging-universal-links)
 
+### Apple team access and permissions
+
+The release rehearsal reached Apple's sign-in screen in App Store Connect. Team membership, current agreements, app record, signing resources and TestFlight access remain unverified. The interactive workspace is Linux and has no Apple signing credentials or connected iPhone. GitHub Actions provides macOS for simulator tests and unsigned device builds. [App Store Connect](https://appstoreconnect.apple.com/) · [Verified iOS run](https://github.com/millerjaytee-star/Jaytee-Shop-Black-Gold/actions/runs/44838106187)
+
+| Gate | Authorized role and evidence |
+| --- | --- |
+| Membership and agreement | The Account Holder confirms active Stabilis organization membership and the current Apple Developer Program License Agreement. The free pilot app has no paid app purchase or In-App Purchase. Check the selected team's agreement notices before creating a record. [Enrollment](https://developer.apple.com/help/account/membership/program-enrollment/) · [Agreements](https://developer.apple.com/help/app-store-connect/manage-agreements/sign-and-update-agreements/) |
+| App ID and capability | Account Holder or Admin confirms or registers the explicit App ID, enables Associated Domains, and checks that the team and bundle ID match the signed entitlements and web association file. [App ID](https://developer.apple.com/help/account/identifiers/register-an-app-id/) · [Capabilities](https://developer.apple.com/help/account/identifiers/enable-app-services/) |
+| Distribution signing | Use Xcode automatic signing with the selected Stabilis team and permission to use cloud-managed distribution signing, or an Apple Distribution certificate with its private key on an authorized Mac and a matching App Store provisioning profile. Account Holder or Admin can create manual App Store profiles. Validate the signed archive in Xcode Organizer. [Cloud-managed certificates](https://developer.apple.com/help/account/certificates/cloud-managed-certificates/) · [Provisioning profiles](https://developer.apple.com/help/account/provisioning-profiles/create-an-app-store-provisioning-profile/) |
+| Record and upload | Account Holder, Admin or App Manager confirms the existing app record or creates one with the explicit bundle ID. An authorized Developer can also upload the signed binary. Confirm Apple processes it under the expected version and build. [App record](https://developer.apple.com/help/app-store-connect/create-an-app-record/add-a-new-app/) · [Upload roles](https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds/) |
+| Internal beta | Account Holder, Admin, App Manager, Developer or Marketing with app access manages internal testing. Complete beta feedback information and export compliance. Add the processed build to the authorized group and verify installation on a named iPhone. [Internal testers](https://developer.apple.com/help/app-store-connect/test-a-beta-version/add-internal-testers/) |
+| Review and release | Account Holder, Admin or App Manager prepares App Review when the founder approves. Verify reviewer sign-in and role access on a fresh device, live support, privacy and consent disclosures, required metadata, screenshots and the chosen distribution path. [Complete review](https://developer.apple.com/help/app-review/before-submitting-for-review/complete-review/) · [Submit an app](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-app/) |
+
 ## Reproduce the simulator and archive checks
 
 On a Mac, run `xcrun simctl list devices available` and set `STABILIS_SIMULATOR_ID` to an available iPhone simulator's UUID. Run the same project and scheme used in CI from the repository root.
@@ -83,10 +96,13 @@ On a Mac, run `xcrun simctl list devices available` and set `STABILIS_SIMULATOR_
 swift test --package-path ios
 stabilis_results=$(mktemp -d)
 xcodebuild -project ios/Stabilis.xcodeproj -scheme Stabilis \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath "$stabilis_results/derived" build-for-testing
+xcodebuild -project ios/Stabilis.xcodeproj -scheme Stabilis \
   -destination "platform=iOS Simulator,id=$STABILIS_SIMULATOR_ID" \
   -derivedDataPath "$stabilis_results/derived" \
   -resultBundlePath "$stabilis_results/Stabilis.xcresult" \
-  -parallel-testing-enabled NO test
+  -parallel-testing-enabled NO test-without-building
 xcrun xcresulttool export attachments --path "$stabilis_results/Stabilis.xcresult" \
   --output-path "$stabilis_results/screenshots"
 xcodebuild -project ios/Stabilis.xcodeproj -scheme Stabilis -configuration Release \
@@ -94,6 +110,4 @@ xcodebuild -project ios/Stabilis.xcodeproj -scheme Stabilis -configuration Relea
   CODE_SIGNING_ALLOWED=NO archive
 ```
 
-The UI suite captures the welcome screen, historical variance, GM assignment, evidence entry and comparison result using fictional records. The compact and large iPhone CI jobs retain the screenshots, unsigned simulator builds and result bundles. The compact job also attempts an unsigned device archive. A signed distribution archive and TestFlight upload use the Apple team steps above.
-
-The interactive workspace runs Linux. GitHub Actions provides the macOS simulator and unsigned archive checks. The workspace has no connected App Store Connect integration. GitHub's integration returned HTTP 403 on a read-only signing configuration check. Apple team membership, bundle ID availability, signing and upload require a verified Apple account and Mac or authorized macOS runner. Signed archive, actual screenshots, hosted reviewer sign-in, support routing and a TestFlight build need direct verification before claiming release readiness.
+The UI suite captures the welcome screen, historical variance, GM assignment, evidence entry and comparison result using fictional records. On starting revision `e9e0d7e`, GitHub Actions verified three native core tests and three UI tests on each of the iPhone 17e and iPhone 17 Pro simulators using Xcode 26.6. The independent unsigned archive job succeeded. That run retains the simulator apps, result bundles, screenshots and unsigned archive. [iOS run and artifacts](https://github.com/millerjaytee-star/Jaytee-Shop-Black-Gold/actions/runs/44838106187)
