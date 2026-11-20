@@ -100,11 +100,16 @@ struct ReviewEditorView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }.disabled(store.saving)
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(editor.saveLabel) { submit() }
-                        .disabled(store.saving || store.busy)
-                        .accessibilityIdentifier(editor.saveIdentifier)
-                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button(editor.saveLabel) { submit() }
+                    .buttonStyle(StabilisButtonStyle())
+                    .disabled(store.saving || store.busy)
+                    .accessibilityIdentifier(editor.saveIdentifier)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(StabilisStyle.paper)
             }
             .interactiveDismissDisabled(store.saving)
         }
