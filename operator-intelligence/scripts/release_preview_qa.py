@@ -225,7 +225,11 @@ def keyboard_and_static_content(browser: Browser) -> None:
     expect(page.get_by_text("$1,500", exact=True)).to_be_visible()
     expect(page.get_by_role("link", name="Request a 20-minute fit call").first).to_be_visible()
     expect(page.get_by_role("link", name="Client login").first).to_be_visible()
-    expect(page.locator('form[name="stabilis-pilot"]')).to_have_attribute("action", "/thanks.html")
+    action = page.locator('form[name="stabilis-pilot"]').get_attribute("action")
+    # Netlify Pretty URLs removes the .html suffix from the static form action.
+    assert action in {"/thanks", "/thanks.html"}, action
+    page.goto(BASE + action)
+    expect(page.get_by_role("heading", name="Fit-call request received.")).to_be_visible()
     context.close()
     print("Mobile keyboard, chart text and static offer/contact: PASS")
 
