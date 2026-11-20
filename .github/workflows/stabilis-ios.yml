@@ -27,6 +27,18 @@ jobs:
       - name: Test native workspace core
         if: matrix.size == 'compact'
         run: swift test --package-path ios
+      - name: Build simulator app and tests
+        run: |
+          mkdir -p ios-results
+          xcodebuild -project ios/Stabilis.xcodeproj -scheme Stabilis \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/stabilis-derived" \
+            build-for-testing > ios-results/xcodebuild-build.log 2>&1 || { tail -100 ios-results/xcodebuild-build.log; exit 1; }
+          ditto -c -k --keepParent "$RUNNER_TEMP/stabilis-derived/Build/Products/Debug-iphonesimulator/Stabilis.app" ios-results/Stabilis-Simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Stabilis-Simulator-${{ matrix.size }}
+          path: ios-results/Stabilis-Simulator.zip
+          if-no-files-found: error
       - name: Select iPhone
         id: simulator
         env:
@@ -43,9 +55,9 @@ jobs:
           phones = [device for device in max(runtimes, key=lambda entry: entry[0])[1]
                     if device["name"].startswith("iPhone")]
           preferred = (
-              ["iPhone 17e", "iPhone 16e", "iPhone 17", "iPhone 16"]
+              ["iPhone SE (3rd generation)", "iPhone 17e", "iPhone 16e", "iPhone 17", "iPhone 16"]
               if os.environ["STABILIS_SIM_SIZE"] == "compact"
-              else ["iPhone 17 Pro Max", "iPhone 16 Pro Max", "iPhone 17 Pro"]
+              else ["iPhone 17 Pro", "iPhone 17 Pro Max", "iPhone 16 Pro Max"]
           )
           phone = next((device for name in preferred for device in phones if device["name"] == name), None)
           if not phone:
@@ -55,6 +67,7 @@ jobs:
               output.write(f"id={phone['udid']}\n")
           PY
       - name: Run native iPhone workflow
+        timeout-minutes: 10
         env:
           STABILIS_SIMULATOR_ID: ${{ steps.simulator.outputs.id }}
         run: |
@@ -64,19 +77,37 @@ jobs:
             -destination "platform=iOS Simulator,id=$STABILIS_SIMULATOR_ID" \
             -derivedDataPath "$RUNNER_TEMP/stabilis-derived" \
             -resultBundlePath ios-results/Stabilis.xcresult \
-            -parallel-testing-enabled NO test | tee ios-results/xcodebuild.log
-          ditto -c -k --keepParent "$RUNNER_TEMP/stabilis-derived/Build/Products/Debug-iphonesimulator/Stabilis.app" ios-results/Stabilis-Simulator.zip
-          xcrun xcresulttool export attachments --path ios-results/Stabilis.xcresult --output-path ios-results/screenshots
-      - name: Validate unsigned device archive
-        if: matrix.size == 'compact'
+            -parallel-testing-enabled NO test-without-building | tee ios-results/xcodebuild.log
+      - name: Export simulator screenshots
+        if: always()
+        run: |
+          if test -d ios-results/Stabilis.xcresult; then
+            xcrun xcresulttool export attachments --path ios-results/Stabilis.xcresult --output-path ios-results/screenshots
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Stabilis-iPhone-Results-${{ matrix.size }}
+          path: |
+            ios-results/*.log
+            ios-results/Stabilis.xcresult
+            ios-results/screenshots
+          if-no-files-found: ignore
+
+  unsigned-archive:
+    name: Unsigned iPhone archive
+    runs-on: macos-26
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate archive
         run: |
           xcodebuild -project ios/Stabilis.xcodeproj -scheme Stabilis -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Stabilis.xcarchive" \
             CODE_SIGNING_ALLOWED=NO archive
-          ditto -c -k --keepParent "$RUNNER_TEMP/Stabilis.xcarchive" ios-results/Stabilis-Unsigned-Archive.zip
+          ditto -c -k --keepParent "$RUNNER_TEMP/Stabilis.xcarchive" Stabilis-Unsigned-Archive.zip
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: Stabilis-iPhone-${{ matrix.size }}
-          path: ios-results/
-          if-no-files-found: ignore
+          name: Stabilis-Unsigned-Archive
+          path: Stabilis-Unsigned-Archive.zip
+          if-no-files-found: error
