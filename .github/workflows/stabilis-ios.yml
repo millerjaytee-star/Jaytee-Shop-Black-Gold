@@ -67,7 +67,7 @@ jobs:
               output.write(f"id={phone['udid']}\n")
           PY
       - name: Run native iPhone workflow
-        timeout-minutes: 10
+        timeout-minutes: 18
         env:
           STABILIS_SIMULATOR_ID: ${{ steps.simulator.outputs.id }}
         run: |
@@ -81,7 +81,7 @@ jobs:
       - name: Export simulator screenshots
         if: always()
         run: |
-          if test -d ios-results/Stabilis.xcresult; then
+          if test -f ios-results/Stabilis.xcresult/Info.plist; then
             xcrun xcresulttool export attachments --path ios-results/Stabilis.xcresult --output-path ios-results/screenshots
           fi
       - uses: actions/upload-artifact@v4
