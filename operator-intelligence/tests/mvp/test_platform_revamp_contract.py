@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[3]
 MIGRATION_DIR = ROOT / 'operator-intelligence/supabase/migrations'
@@ -9,12 +10,16 @@ def text(name: str) -> str:
 def migration_text() -> str:
     return '\n'.join(p.read_text() for p in sorted(MIGRATION_DIR.glob('20260901164*.sql'))).lower()
 
-def test_public_home_is_product_first_and_financially_safe():
-    home=text('index.html')
-    assert 'OPERATOR INTELLIGENCE' in home
-    assert 'See where margin is moving' in home
-    assert 'FICTIONAL' in home and '$392,570.56' in home and 'Verified Value' in home
-    assert 'Profit Leak Score' in home and 'Request Diagnostic Review' in home
+def test_public_home_explains_the_pilot_and_labels_fictional_results():
+    home = text('index.html')
+    copy = ' '.join(re.sub(r'<[^>]+>', ' ', home).split())
+    assert 'operator intelligence' in copy.lower()
+    assert 'Juniper Café' in copy and 'Fictional example' in copy
+    assert '$450' in copy and '$325 observed improvement' in copy and '$0 client-verified impact' in copy
+    assert 'href="/proof-ledger"' in home
+    assert 'Profit Leak Score' in copy and 'Request a 20-minute fit call' in copy
+    assert '14-Day Margin Recovery Diagnostic' in copy and '$1,500' in copy
+    assert '/labor-review' in home
     assert 'data-netlify' in home
 
 def test_demo_preserves_canonical_financial_contract_and_modules():
@@ -22,6 +27,8 @@ def test_demo_preserves_canonical_financial_contract_and_modules():
     assert 'FICTIONAL DEMO DATA' in shell
     compact=data.replace(' ','')
     assert 'modeledOpportunity:392570.56' in compact
+    proof = text('proof-ledger.html')
+    assert '$392,570.56' in proof and 'Verified Value' in proof
     assert 'annualized:102844.37' in compact
     assert "kind:'SUPPORTING'" in data and 'annualized:0' in data and 'NOT COUNTED TWICE' in data
     for route in ['command','morning','locations','labor','forecast','inventory','purchasing','food','revenue','opportunities','actions','results','reports','intelligence','alerts','data','expansion','scenarios','weekly','period-close']:
@@ -52,13 +59,23 @@ def test_public_trust_and_legal_pages_exist():
     security=text('security.html').lower();privacy=text('privacy.html').lower();terms=text('terms.html')
     assert 'row level security' in security
     assert 'source, report and evidence' in security
-    assert 'tenant-scoped' in privacy
+    assert 'organization and location grants' in privacy and 'keychain' in privacy
+    assert 'href="/support#account-deletion"' in privacy
     assert 'Modeled opportunity is not verified savings' in terms
     assert '$392,570.56' in terms and 'fictional' in terms.lower()
 
+def test_support_request_uses_separate_static_capture_and_receipt():
+    support=text('support.html');receipt=text('support-received.html')
+    assert 'href="mailto:stabilisopsgroup@gmail.com">stabilisopsgroup@gmail.com</a>' in support
+    assert 'name="stabilis-support" action="/support-received" method="POST" data-netlify="true"' in support
+    assert 'name="form-name" value="stabilis-support"' in support
+    assert 'id="account-deletion"' in support and 'value="account-deletion"' in support
+    assert 'Support request received' in receipt and 'identity verification' in receipt
+
 def test_netlify_security_and_clean_routes():
     redirects=text('_redirects');toml=text('netlify.toml')
-    for route in ['/operator-intelligence','/operator-intelligence-report','/login','/app','/security','/privacy','/terms']:
+    for route in ['/operator-intelligence','/operator-intelligence-report','/login','/app',
+                  '/security','/privacy','/support','/support-received','/terms']:
         assert route in redirects
     for header in ['Content-Security-Policy','Strict-Transport-Security','X-Content-Type-Options','X-Robots-Tag']:
         assert header in toml
@@ -80,6 +97,8 @@ def test_sample_report_preserves_estimated_vs_verified_distinction():
     report=text('operator-intelligence-report.html')
     assert 'FICTIONAL DEMO DATA' in report
     assert '$392,570.56' in report
-    assert 'Verified Value = $0' in report
+    assert 'Modeled opportunity' in report
+    assert 'Observed change' in report
+    assert 'Client-verified financial impact (Verified Value)</b> is $0' in report
     assert 'HHR-07 overtime is supporting evidence' in report
     assert '$0 additional rollup' in report

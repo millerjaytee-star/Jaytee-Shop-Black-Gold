@@ -46,3 +46,29 @@ python scripts/run_analysis.py
 ```
 
 See `docs/architecture.md`, `docs/database.md`, `docs/intelligence-engine.md`, `docs/security-release-gate.md`, `docs/operator-intelligence-v1.md`, and `docs/deployment.md`.
+
+## Weekly labor review
+
+From the repository root, run `python3 operator-intelligence/scripts/preview_site.py --port 8080`, then open `http://127.0.0.1:8080/`. The public walkthrough is at `/labor-review`. It uses fictional information and saves changes in that browser. Client work opens at `/app#labor-review` and requires a real assigned organization and location.
+
+- **Jaytee:** Open the public homepage, try the labor review and follow the fit-call form. The 14-Day Margin Recovery Diagnostic is $1,500 for one agreed location. Update the shared offer in `scripts/sync-founding-offer.mjs` and run `node scripts/sync-founding-offer.mjs` to regenerate the pre-rendered copy.
+- **Owner:** Open the fictional review for Juniper Café, inspect the $450 overage, choose the manager and approve the action. Week 1 has $250 attributable to lower sales and $200 attributable to payroll above schedule.
+- **GM:** Switch the demo role to General manager, accept the assignment and submit evidence. Authenticated users receive their assigned role from their membership.
+- **Owner or analyst:** Compare the second week, record whether the periods are comparable, and print the review. Using the example inputs, variance falls to $125, an observed improvement of $325. Verified Value remains $0 until documented client finance validation.
+- **Analyst:** Open a new review to inspect intake and release. Source references, corrections, review state and history accompany the underlying weekly totals.
+
+The public walkthrough runs on Netlify without Supabase. Deploy previews and the loopback server use a public-only browser configuration. Private testing uses isolated synthetic roles and a test transport. Customer release requires an active dedicated Stabilis backend, a reviewed migration rehearsal and validation against existing tenant and location grants. Netlify handles the hosted fit-call form. The loopback preview serves the pages and does not process a real submission.
+
+Synthetic source files and worksheet mapping are in `assets/labor-examples/` and on the public review. The files contain fictional aggregates. Build the same static publish directory as Netlify with `python3 operator-intelligence/scripts/build_site.py`. Repository documentation, migrations, tests and generated engine records stay outside that directory. See the [verification handoff](docs/weekly-labor-verification.md) for the deployment baseline and test scope.
+
+On the authenticated web review, confirmed CSV/XLSX mappings retain the location, fiscal week, worksheet, coverage, checksum and available role or daypart figures in version history. Analysts can opt in to archiving deidentified, single-location originals with the end date from the signed scope. View source history to inspect prior mappings and download retained originals. The browser verifies each download against the saved checksum.
+
+Apply the weekly review and weekly source archive migrations in order on isolated staging. The archive reuses the private `stabilis-raw` bucket and requires the Storage operation-aware policy helper. Review the existing grants and test authenticated upload and download with staging Storage. Access ends at the signed retention cutoff. The pilot administrator must remove expired originals through the Storage API as part of the signed closeout and retain only the permitted audit references.
+
+The optional production AI readiness probe uses a private `STABILIS_AI_HEALTH_SECRET` shared by the Netlify production function and the GitHub Actions production job. Configure a fresh value if that probe is needed. The preview checks unauthenticated behavior without running a billable model request.
+
+## iPhone app
+
+Open `ios/Stabilis.xcodeproj` in Xcode 26 or later and choose the **Stabilis** scheme and an iPhone simulator. The app targets iOS 17 or later and starts with the offline fictional Juniper Café review. The [iOS release handoff](docs/ios-app-store.md) includes simulator and archive commands, App Review materials, and the signing and support requirements.
+
+For an authorized synthetic staging build, create the ignored file `ios/StabilisApp/Configuration/Local.xcconfig` and supply the HTTPS Stabilis staging Supabase endpoint, its publishable key, and the HTTPS recovery page configured against the same backend. In xcconfig, write the URL scheme as `https:/$()/` to escape the comment delimiter. Leave recovery blank until the redirect allowlist and web password reset are tested. Shipping builds require a verified Apple team, signed bundle identifier and approved backend. Universal Links also require the same application identifier in the production AASA build setting `STABILIS_APPLE_APPLICATION_IDENTIFIER`.

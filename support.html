@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stabilis Operator Intelligence™ Support</title>
+  <meta name="description" content="Contact Stabilis Ops Group for help with Stabilis Operator Intelligence, sign-in or an account deletion request.">
+  <link rel="stylesheet" href="/assets/operator-guides.css">
+</head>
+<body class="support">
+<div class="guide-wrap">
+  <nav class="guide-nav" aria-label="Site navigation">
+    <a class="brand" href="/" aria-label="Stabilis Ops Group home"><span class="brand-symbol" aria-hidden="true"><i></i><i></i><i></i></span><span>Stabilis <small>Ops Group</small></span></a>
+    <a class="back" href="/privacy">Privacy</a>
+  </nav>
+  <main>
+    <header class="hero">
+      <h1>Stabilis support</h1>
+      <p class="lead">Contact Stabilis Ops Group, LLC for help with Operator Intelligence™, sign-in, feedback or a privacy request. Use your assigned work email if your request concerns your account.</p>
+      <a class="support-email" href="mailto:stabilisopsgroup@gmail.com">stabilisopsgroup@gmail.com</a>
+    </header>
+    <section class="note-panel" aria-labelledby="account-deletion">
+      <h2 id="account-deletion">Account deletion</h2>
+      <p>Organizations provision Stabilis accounts by invitation. To request deletion, choose <strong>Account deletion</strong> below or email support with “Account deletion” in the subject. Use your assigned work email. Stabilis will reply to verify your identity and confirm the request.</p>
+      <p>Deletion covers your sign-in and personal account data, subject to applicable retention obligations. Your organization may keep shared operating records, approved reports or action history under its pilot agreement. Stabilis will explain any data that needs to be retained.</p>
+    </section>
+    <form class="support-form" name="stabilis-support" action="/support-received" method="POST" data-netlify="true" netlify-honeypot="bot-field" aria-labelledby="support-request">
+      <h2 id="support-request">Send a support request</h2>
+      <input type="hidden" name="form-name" value="stabilis-support">
+      <p hidden><label>Leave this empty <input name="bot-field"></label></p>
+      <div>
+        <label for="support-email">Email</label>
+        <input id="support-email" name="email" type="email" autocomplete="email" required>
+      </div>
+      <div>
+        <label for="support-topic">Topic</label>
+        <select id="support-topic" name="topic" required>
+          <option value="" disabled selected>Choose a topic</option>
+          <option value="sign-in">Account or sign-in help</option>
+          <option value="feedback">App question or feedback</option>
+          <option value="privacy">Privacy request</option>
+          <option value="account-deletion">Account deletion</option>
+        </select>
+      </div>
+      <div>
+        <label for="support-message">How can we help?</label>
+        <textarea id="support-message" name="message" rows="4" maxlength="2000" aria-describedby="support-hint" required></textarea>
+        <p class="support-hint" id="support-hint">For account deletion, a short request is enough. Leave passwords, verification codes, payroll reports and other private records out of this form.</p>
+      </div>
+      <button class="btn" type="submit">Send support request</button>
+    </form>
+  </main>
+  <footer class="foot">© 2026 Stabilis Ops Group, LLC · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+</div>
+</body>
+</html>

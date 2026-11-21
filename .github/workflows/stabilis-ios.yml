@@ -1,0 +1,113 @@
+name: Stabilis iPhone Simulator
+
+on:
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/stabilis-ios.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  simulator:
+    name: iPhone simulator (${{ matrix.size }})
+    runs-on: macos-26
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        size: [compact, large]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Apple toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+      - name: Test native workspace core
+        if: matrix.size == 'compact'
+        run: swift test --package-path ios
+      - name: Build simulator app and tests
+        run: |
+          mkdir -p ios-results
+          xcodebuild -project ios/Stabilis.xcodeproj -scheme Stabilis \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/stabilis-derived" \
+            build-for-testing > ios-results/xcodebuild-build.log 2>&1 || { tail -100 ios-results/xcodebuild-build.log; exit 1; }
+          ditto -c -k --keepParent "$RUNNER_TEMP/stabilis-derived/Build/Products/Debug-iphonesimulator/Stabilis.app" ios-results/Stabilis-Simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Stabilis-Simulator-${{ matrix.size }}
+          path: ios-results/Stabilis-Simulator.zip
+          if-no-files-found: error
+      - name: Select iPhone
+        id: simulator
+        env:
+          STABILIS_SIM_SIZE: ${{ matrix.size }}
+        run: |
+          xcrun simctl list -j devices available > "$RUNNER_TEMP/stabilis-devices.json"
+          python3 - "$RUNNER_TEMP/stabilis-devices.json" <<'PY'
+          import json, os, sys
+          devices = json.load(open(sys.argv[1]))["devices"]
+          runtimes = [(tuple(map(int, key.split("iOS-")[-1].split("-"))), entries)
+                      for key, entries in devices.items() if "iOS-" in key and entries]
+          if not runtimes:
+              raise SystemExit("No iOS simulator runtimes installed")
+          phones = [device for device in max(runtimes, key=lambda entry: entry[0])[1]
+                    if device["name"].startswith("iPhone")]
+          preferred = (
+              ["iPhone SE (3rd generation)", "iPhone 17e", "iPhone 16e", "iPhone 17", "iPhone 16"]
+              if os.environ["STABILIS_SIM_SIZE"] == "compact"
+              else ["iPhone 17 Pro", "iPhone 17 Pro Max", "iPhone 16 Pro Max"]
+          )
+          phone = next((device for name in preferred for device in phones if device["name"] == name), None)
+          if not phone:
+              raise SystemExit(f"No matching iPhone simulator. Available: {[d['name'] for d in phones]}")
+          print(f"Selected {phone['name']} ({phone['udid']})")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"id={phone['udid']}\n")
+          PY
+      - name: Run native iPhone workflow
+        timeout-minutes: 18
+        env:
+          STABILIS_SIMULATOR_ID: ${{ steps.simulator.outputs.id }}
+        run: |
+          set -o pipefail
+          mkdir -p ios-results
+          xcodebuild -project ios/Stabilis.xcodeproj -scheme Stabilis \
+            -destination "platform=iOS Simulator,id=$STABILIS_SIMULATOR_ID" \
+            -derivedDataPath "$RUNNER_TEMP/stabilis-derived" \
+            -resultBundlePath ios-results/Stabilis.xcresult \
+            -parallel-testing-enabled NO test-without-building | tee ios-results/xcodebuild.log
+      - name: Export simulator screenshots
+        if: always()
+        run: |
+          if test -f ios-results/Stabilis.xcresult/Info.plist; then
+            xcrun xcresulttool export attachments --path ios-results/Stabilis.xcresult --output-path ios-results/screenshots
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Stabilis-iPhone-Results-${{ matrix.size }}
+          path: |
+            ios-results/*.log
+            ios-results/Stabilis.xcresult
+            ios-results/screenshots
+          if-no-files-found: ignore
+
+  unsigned-archive:
+    name: Unsigned iPhone archive
+    runs-on: macos-26
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate archive
+        run: |
+          xcodebuild -project ios/Stabilis.xcodeproj -scheme Stabilis -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Stabilis.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO archive
+          ditto -c -k --keepParent "$RUNNER_TEMP/Stabilis.xcarchive" Stabilis-Unsigned-Archive.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Stabilis-Unsigned-Archive
+          path: Stabilis-Unsigned-Archive.zip
+          if-no-files-found: error

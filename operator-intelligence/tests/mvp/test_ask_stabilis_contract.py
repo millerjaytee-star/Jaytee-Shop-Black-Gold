@@ -50,7 +50,9 @@ def test_ai_gateway_health_probe_uses_supported_sdk_and_rate_limit():
     assert 'new OpenAI()' in fn
     assert 'chat.completions.create' in fn
     assert 'process.env.OPENAI_BASE_URL' in fn
-    assert 'STABILIS_AI_HEALTH_TOKEN' in fn
+    assert 'STABILIS_AI_HEALTH_SECRET' in fn
+    assert 'req.headers.get("authorization")' in fn
+    assert 'searchParams' not in fn
     assert 'rateLimit' in fn
     assert 'windowLimit: 5' in fn
     assert 'aggregateBy: ["ip", "domain"]' in fn

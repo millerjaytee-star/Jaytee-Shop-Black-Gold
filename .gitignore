@@ -51,3 +51,10 @@ blob-report/
 *~
 .DS_Store
 Thumbs.db
+
+# Local Xcode provisioning and generated app artifacts
+ios/StabilisApp/Configuration/Local.xcconfig
+ios/.build/
+ios/.swiftpm/
+*.xcuserstate
+xcuserdata/
