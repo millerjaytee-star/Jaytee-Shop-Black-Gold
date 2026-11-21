@@ -1,6 +1,7 @@
 """Run the actual labor migration against disposable Postgres and a synthetic auth foundation."""
 
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
@@ -97,8 +98,8 @@ class Database:
         return self.run(f"select public.stabilis_labor_reviews('{org}','{location}')", actor=actor, **kwargs)
 
 
-@pytest.fixture(scope="module")
-def db():
+@contextmanager
+def disposable_database():
     initdb = shutil.which("initdb")
     if not initdb and shutil.which("pg_config"):
         candidate = Path(subprocess.check_output(["pg_config", "--bindir"], text=True).strip()) / "initdb"
@@ -151,8 +152,6 @@ def db():
         try:
             instance = Database(bindir, port, password)
             instance.run((HERE / "foundation.sql").read_text())
-            instance.run(MIGRATION.read_text())
-            instance.run(SOURCE_MIGRATION.read_text())
             instance.run(
                 f"insert into stabilis.organizations values ('{ORG}'),('{OTHER_ORG}');"
                 f"insert into stabilis.locations(id,organization_id) values ('{LOCATION}','{ORG}'),('{OTHER_LOCATION}','{ORG}'),"
@@ -179,6 +178,65 @@ def db():
             yield instance
         finally:
             subprocess.run(control + ["-m", "immediate", "-w", "stop"], check=True, capture_output=True)
+
+
+@pytest.fixture(scope="module")
+def db():
+    with disposable_database() as instance:
+        instance.run(MIGRATION.read_text())
+        instance.run(SOURCE_MIGRATION.read_text())
+        yield instance
+
+
+def test_weekly_migrations_rollback_and_retry():
+    catalog = """
+    select jsonb_build_object(
+      'relations', (select jsonb_agg(oid::regclass::text order by oid::regclass::text) from pg_class
+        where relnamespace in ('stabilis'::regnamespace, 'storage'::regnamespace, 'public'::regnamespace)),
+      'functions', (select jsonb_agg(oid::regprocedure::text order by oid::regprocedure::text) from pg_proc
+        where pronamespace in ('stabilis'::regnamespace, 'storage'::regnamespace, 'public'::regnamespace)),
+      'policies', (select jsonb_agg(policyname order by policyname) from pg_policies),
+      'triggers', (select jsonb_agg(tgname order by tgname) from pg_trigger where not tgisinternal)
+    );
+    """
+    location = f"select to_jsonb(l) from stabilis.locations l where id='{LOCATION}';"
+    storage_object = "select to_jsonb(o) from storage.objects o where name='legacy/synthetic.csv';"
+    with disposable_database() as instance:
+        instance.run("insert into storage.objects(bucket_id,name) values ('stabilis-raw','legacy/synthetic.csv');")
+        original_location = instance.run(location)
+        original_object = instance.run(storage_object)
+
+        # Collide with the final review RPC after the migration has created its tables and helpers.
+        review_rpc = "public.stabilis_save_labor_review(uuid,uuid,uuid,integer,text,jsonb)"
+        instance.run(f"create function {review_rpc} returns jsonb language sql as $$ select 'null'::jsonb $$;")
+        before_review_migration = instance.run(catalog)
+        instance.run(MIGRATION.read_text(), error='function "stabilis_save_labor_review" already exists')
+        assert instance.run(catalog) == before_review_migration
+        assert instance.run(location) == original_location
+        assert instance.run(storage_object) == original_object
+        instance.run(f"drop function {review_rpc};")
+        instance.run(MIGRATION.read_text())
+
+        review = instance.save(ANALYST, "create", {"week_start": WEEK, "inputs": INPUT, "source": "Synthetic exports"})
+        review = instance.save(ANALYST, "release", {"note": "Synthetic review"}, review)
+        assert review["metrics"]["total_over"] == 450
+        # Collide after the source migration has added its registry, Storage policies and audit trigger.
+        source_rpc = "public.stabilis_weekly_source_history(uuid,uuid,uuid)"
+        instance.run(f"create function {source_rpc} returns jsonb language sql as $$ select 'null'::jsonb $$;")
+        before_source_migration = instance.run(catalog)
+        instance.run(SOURCE_MIGRATION.read_text(), error='function "stabilis_weekly_source_history" already exists')
+        assert instance.run(catalog) == before_source_migration
+        assert instance.run(location) == original_location
+        assert instance.run(storage_object) == original_object
+        assert instance.read(OWNER) == [review]
+        instance.run(f"drop function {source_rpc};")
+        instance.run(SOURCE_MIGRATION.read_text())
+
+        history = f"select public.stabilis_weekly_source_history('{ORG}','{LOCATION}','{review['id']}');"
+        [original_import] = instance.run(history, actor=ANALYST)
+        assert original_import["source"] == "Synthetic exports" and original_import["version"] == 1
+        assert instance.read(OWNER) == [review]
+        assert instance.run(storage_object) == original_object
 
 
 def test_server_math(db):

@@ -2,6 +2,8 @@
 
 Checked November 20, 2026 against draft PR #15 at `79a3ba2` and the published site.
 
+On November 20, Jaytee approved `stabilisopsgroup@gmail.com` for public support and controlled replies. The release branch adds the address on `/support`. The connected Gmail account is a different mailbox. A direct inbox or hosted Netlify notification test still requires verified access and routing.
+
 | Surface | Observed behavior |
 | --- | --- |
 | PR #15 fit-call form | Hosted home and receipt return HTTP 200. The form posts `stabilis-pilot` to `/thanks`. The receipt identifies Jaytee and a 20-minute fit-call request. [Preview](https://deploy-preview-15--stabilis-ops-group.netlify.app/#diagnostic) · [Receipt](https://deploy-preview-15--stabilis-ops-group.netlify.app/thanks) |
@@ -26,9 +28,9 @@ For an existing Chromium installation, set `STABILIS_CHROMIUM_PATH` to its execu
 
 ## Hosted delivery and support readiness
 
-1. Jaytee approves the public support contact and identifies who monitors the inbox and covers absences. App Store Connect requires the Support URL to provide actual contact information. Record the confirmed address or other approved contact in the support page once verified. [Apple metadata reference](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information/)
+1. Verify the approved address appears and opens as a mail link on the hosted `/support` page. App Store Connect requires the Support URL to provide actual contact information. Confirm the staff coverage for the approved inbox. [Apple metadata reference](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information/)
 2. Verify Netlify notification destinations for both forms in the signed-in project dashboard. For a hosted rehearsal, use an authorized isolated project or another proved synthetic-only route. Review all email recipients, webhooks and integrations before posting. The existing PR preview uses the same project and form registrations as production. [Netlify form notifications](https://docs.netlify.com/manage/forms/notifications/)
-3. Use only an inbox approved for synthetic tests. Submit one labeled inquiry and one labeled support request from that inbox. Check the form receipt, the resulting Netlify entry, notification delivery and the reply received at the same controlled address. Record the test timestamps and message or submission references in the private release log. No test in this run reached hosted notifications.
+3. Once the rehearsal delivery is verified to target only the approved inbox, submit one labeled inquiry and one labeled support request from a controlled test address. Check the form receipt, the resulting Netlify entry, notification delivery and the reply received at the controlled address. Record the test timestamps and message or submission references in the private release log. No test in this run reached hosted notifications.
 
 ## Account deletion handling
 

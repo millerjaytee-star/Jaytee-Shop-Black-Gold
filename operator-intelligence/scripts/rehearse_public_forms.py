@@ -96,6 +96,10 @@ def rehearse_browser(base, inbox, port):
 
                 page.route("**/*", route_message)
                 page.goto(base + page_path)
+                if name == "stabilis-support":
+                    contact = page.get_by_role("link", name="stabilisopsgroup@gmail.com", exact=True)
+                    expect(contact).to_be_visible()
+                    expect(contact).to_have_attribute("href", "mailto:stabilisopsgroup@gmail.com")
                 form = page.locator(f'form[name="{name}"]')
                 expect(form).to_have_attribute("action", receipt)
                 for key, value in fields.items():

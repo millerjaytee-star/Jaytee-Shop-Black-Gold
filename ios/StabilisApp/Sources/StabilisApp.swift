@@ -7,6 +7,7 @@ struct StabilisApp: App {
 
     init() {
         let configuration = Bundle.main
+        let publicOrigin = URL(string: "https://stabilis-ops-group.netlify.app")!
         let configuredOrigin = (configuration.object(forInfoDictionaryKey: "StabilisWebOrigin") as? String)
             .flatMap(URL.init(string:))
             .flatMap { url in
@@ -14,7 +15,7 @@ struct StabilisApp: App {
                 url.user == nil && url.password == nil && url.query == nil && url.fragment == nil &&
                 (url.path.isEmpty || url.path == "/") ? url : nil
             }
-        let origin = configuredOrigin ?? URL(string: "https://stabilis-ops-group.netlify.app")!
+        let origin = configuredOrigin ?? publicOrigin
         let client: WorkspaceClient?
         if let raw = configuration.object(forInfoDictionaryKey: "StabilisSupabaseURL") as? String,
            let url = URL(string: raw), url.scheme == "https",
@@ -37,7 +38,8 @@ struct StabilisApp: App {
             recoveryURL = nil
         }
         _store = StateObject(wrappedValue: WorkspaceStore(
-            client: client, webOrigin: origin, serviceName: "Stabilis", recoveryURL: recoveryURL
+            client: client, webOrigin: origin, serviceName: "Stabilis",
+            recoveryURL: recoveryURL, supportOrigin: publicOrigin
         ))
     }
 

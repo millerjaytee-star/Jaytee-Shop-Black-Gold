@@ -1,5 +1,7 @@
 # Weekly labor review verification
 
+For the later iPhone and staging changes, see the [rollout and release gates](stabilis-rollout.md). The evidence below describes the web revamp baseline.
+
 ## Starting revisions
 
 | Surface | Verified state on November 20, 2026 |

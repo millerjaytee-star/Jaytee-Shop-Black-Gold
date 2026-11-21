@@ -17,6 +17,32 @@ With synthetic roles, also rehearse an overdue action, duplicate submission, con
 
 An App Review or beta coordinator should fill in the staging origin, test availability window, seeded location, exact review link and role instructions for that build. Provide a seeded GM account with one assigned action. Provide an owner account if the reviewer is expected to compare the week. Exercise both fresh-install sign-ins using the supplied paths before handing off. The offline walkthrough can be reviewed independently of the staging account. [Apple review information](ios-app-store.md#app-store-connect-draft)
 
+## Local migration and retention rehearsal
+
+Run the rollback and retry test from the repository root with PostgreSQL server binaries and the repository's Python test dependencies installed.
+
+```bash
+cd operator-intelligence
+python -m pytest -q tests/labor/test_postgres_labor_review.py -k rollback_and_retry
+```
+
+The test introduces a database function collision late in each migration, evaluates the original SQL, compares the database catalog and verifies the previous location, archive metadata and released review remain intact. It removes each synthetic conflict and reapplies the same migration. Preserve the hosted migration ledger and data if a deployment fails after a schema migration commits. Reverting an application deploy and applying a reviewed database fix are distinct operations.
+
+On Linux with local Docker and PostgreSQL server binaries on `PATH`, use the pinned images to exercise the real service path. Run these commands from the repository root.
+
+```bash
+docker pull supabase/gotrue:v2.187.0
+docker pull postgrest/postgrest:v14.0
+docker pull supabase/storage-api:v1.98.5
+python3 operator-intelligence/scripts/rehearse_weekly_storage.py
+```
+
+The script uses local Docker, loopback services, disposable PostgreSQL and six fictional accounts. Real Auth tokens exercise analyst release, owner assignment, GM acceptance and evidence, comparison and finance validation through PostgREST. It scopes the $450 baseline, $125 following-week variance, $325 observed change and $150 synthetic finance approval to one location. It checks draft isolation, cross-tenant denial, unassigned GM and read-only finance denials, an idempotent acceptance retry, location-grant revocation and Auth refresh rejection after logout.
+
+The archive test verifies authenticated upload, immutable bytes, signed-link denial, retained download and expiry. The synthetic administrator deletes the expired file through the Storage API. The test checks the object row and backing file are gone, compares the neighboring original byte-for-byte and reopens the permitted checksum history. The script removes its containers and database on exit. [Rehearsal script](../operator-intelligence/scripts/rehearse_weekly_storage.py)
+
+On an approved staging project, confirm the actual membership and location grants, the private `stabilis-raw` bucket, the Storage operation helper and the migration ledger before applying the weekly review and archive migrations. Use one explicit path at a time when deleting expired originals from an approved pilot. Confirm the bucket, location, retention cutoff and allowed residual audit references, then use the administrator's Storage API and verify the exact path is gone. Keep staging and the hosted pilot release gate separate. [Controlled-pilot gate](security-release-gate.md)
+
 ## Operator pilot session
 
 Use this script after the founder authorizes participation and the approved environment and engagement permit the records. The 14-day diagnostic starts on the agreed date after signed scope, cleared payment in full and minimum data readiness. Confirm the one location, its fiscal week, the approved folder and the raw-file retention date. [Pilot scope and research plan](pilot-operating-model.md) · [Security release gate](security-release-gate.md)

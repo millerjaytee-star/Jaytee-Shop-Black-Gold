@@ -62,6 +62,7 @@ def test_public_trust_and_legal_pages_exist():
 
 def test_support_request_uses_separate_static_capture_and_receipt():
     support=text('support.html');receipt=text('support-received.html')
+    assert 'href="mailto:stabilisopsgroup@gmail.com">stabilisopsgroup@gmail.com</a>' in support
     assert 'name="stabilis-support" action="/support-received" method="POST" data-netlify="true"' in support
     assert 'name="form-name" value="stabilis-support"' in support
     assert 'id="account-deletion"' in support and 'value="account-deletion"' in support

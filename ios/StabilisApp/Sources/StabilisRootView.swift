@@ -204,8 +204,8 @@ struct StabilisRootView: View {
 
     private var supportLinks: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Link("Support and accessibility", destination: store.webOrigin.appendingPathComponent("support"))
-            Link("Privacy policy", destination: store.webOrigin.appendingPathComponent("privacy"))
+            Link("Support and accessibility", destination: store.supportOrigin.appendingPathComponent("support"))
+            Link("Privacy policy", destination: store.supportOrigin.appendingPathComponent("privacy"))
             if let deletion = accountDeletionURL {
                 Link("Request account deletion", destination: deletion)
             }
@@ -217,7 +217,7 @@ struct StabilisRootView: View {
     }
 
     private var accountDeletionURL: URL? {
-        var components = URLComponents(url: store.webOrigin.appendingPathComponent("support"), resolvingAgainstBaseURL: false)
+        var components = URLComponents(url: store.supportOrigin.appendingPathComponent("support"), resolvingAgainstBaseURL: false)
         components?.fragment = "account-deletion"
         return components?.url
     }
@@ -269,7 +269,7 @@ private struct SignInView: View {
                         }
                         .disabled(store.busy)
                     } else {
-                        Link("Get sign-in help", destination: store.webOrigin.appendingPathComponent("support"))
+                        Link("Get sign-in help", destination: store.supportOrigin.appendingPathComponent("support"))
                     }
                 }
             }

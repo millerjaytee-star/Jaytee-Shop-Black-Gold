@@ -31,6 +31,7 @@ final class WorkspaceStore: ObservableObject {
     @Published var requestedReview: UUID?
 
     let webOrigin: URL
+    let supportOrigin: URL
     let serviceName: String
     let recoveryURL: URL?
     private let client: WorkspaceClient?
@@ -40,9 +41,11 @@ final class WorkspaceStore: ObservableObject {
     private var revision = UUID()
     private var restored = false
 
-    init(client: WorkspaceClient?, webOrigin: URL, serviceName: String, recoveryURL: URL? = nil) {
+    init(client: WorkspaceClient?, webOrigin: URL, serviceName: String,
+         recoveryURL: URL? = nil, supportOrigin: URL? = nil) {
         self.client = client
         self.webOrigin = webOrigin
+        self.supportOrigin = supportOrigin ?? webOrigin
         self.serviceName = serviceName
         self.recoveryURL = recoveryURL
     }
