@@ -147,6 +147,8 @@ def check_home(page: Page, mobile: bool) -> None:
     expect(chart.locator("#laborGap")).to_have_text("$450")
     expect(chart.locator("#salesEffect")).to_have_text("$250")
     expect(chart.locator("#payrollEffect")).to_have_text("$200")
+    expect(chart.get_by_text("$325 observed improvement", exact=True)).to_be_visible()
+    expect(chart.get_by_text("$0 client-verified impact", exact=True)).to_be_visible()
     chart.get_by_role("button", name="Week 2").click()
     expect(chart.locator("#laborGap")).to_have_text("$125")
     expect(chart.locator("#salesEffect")).to_have_text("$125")
@@ -166,6 +168,11 @@ def check_home(page: Page, mobile: bool) -> None:
     expect(form.locator('select[name="locations"]')).to_have_value("")
     form.locator('select[name="locations"]').select_option(label="3–15")
     assert not form.evaluate("(form) => form.checkValidity()")
+    form.get_by_label("Your name").fill("Fictional Operator")
+    form.get_by_label("Business email").fill("owner@example.invalid")
+    form.get_by_label("Company", exact=True).fill("Fictional Café Group")
+    expect(form.locator('textarea[name="problem"]')).to_have_value("")
+    assert form.evaluate("(form) => form.checkValidity()"), "The context field should be optional."
 
     sliders = page.locator("#score input[data-score]")
     expect(sliders).to_have_count(5)
@@ -211,7 +218,7 @@ def keyboard_and_static_content(browser: Browser) -> None:
     skip = page.get_by_role("link", name="Skip to content")
     expect(skip).to_be_focused()
     page.keyboard.press("Enter")
-    assert page.url.endswith("#main")
+    expect(page).to_have_url(BASE + "/#main")
     chart = page.locator("#heroLab")
     week = chart.get_by_role("button", name="Week 2")
     week.focus()
@@ -227,6 +234,9 @@ def keyboard_and_static_content(browser: Browser) -> None:
     expect(page.get_by_text("$1,500", exact=True)).to_be_visible()
     expect(page.get_by_role("link", name="Request a 20-minute fit call").first).to_be_visible()
     expect(page.get_by_role("link", name="Client login").first).to_be_visible()
+    expect(page.locator("#heroLab #laborGap")).to_have_text("$450")
+    expect(page.locator("#heroLab .weeks")).to_be_hidden()
+    expect(page.locator("#score .sliders")).to_be_hidden()
     action = page.locator('form[name="stabilis-pilot"]').get_attribute("action")
     # Netlify Pretty URLs removes the .html suffix from the static form action.
     assert action in {"/thanks", "/thanks.html"}, action

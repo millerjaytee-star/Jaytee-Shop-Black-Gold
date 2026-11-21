@@ -51,4 +51,6 @@ import {calculateExample, exampleInputs, exampleWeeks} from './labor-example.js'
   }
 
   controls.forEach((button, index) => button.addEventListener('click', () => showWeek(index)));
+  document.querySelector('.weeks').hidden = false;
+  document.querySelectorAll('#score .score-result, #score .sliders').forEach(element => element.hidden = false);
 })();
