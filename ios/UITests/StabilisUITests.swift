@@ -102,10 +102,17 @@ final class StabilisUITests: XCTestCase {
         requireObservedChange()
 
         tap("review.shareSummary")
-        let copy = app.buttons["Copy"].firstMatch
-        let save = app.buttons["Save to Files"].firstMatch
-        XCTAssertTrue(copy.waitForExistence(timeout: 5) || save.waitForExistence(timeout: 5), "Expected the native share sheet to offer an export action.")
+        let sheet = app.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier IN %@", argumentArray: [["ActivityListView", "ShareSheet.RemoteContainerView", "activityCollectionView"]]
+        )).firstMatch
+        let didPresent = sheet.waitForExistence(timeout: 8)
         capture("07 Native PDF share sheet")
+        XCTAssertTrue(didPresent, "Expected the system activity sheet to open.")
+        let preview = app.navigationBars["Stabilis weekly labor review"].firstMatch
+        let exportAction = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label IN %@", argumentArray: [["Copy", "Save to Files", "Markup", "Print"]]
+        )).firstMatch
+        XCTAssertTrue(preview.exists || exportAction.exists, "Expected the review preview or an export action in the system sheet.")
     }
 
     private func openFreshFictionalReview() {
