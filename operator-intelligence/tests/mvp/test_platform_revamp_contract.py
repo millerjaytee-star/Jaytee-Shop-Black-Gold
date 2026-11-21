@@ -14,7 +14,9 @@ def test_public_home_explains_the_pilot_and_labels_fictional_results():
     home = text('index.html')
     copy = ' '.join(re.sub(r'<[^>]+>', ' ', home).split())
     assert 'operator intelligence' in copy.lower()
-    assert 'fictional' in copy.lower() and '$392,570.56' in copy and 'Verified Value' in copy
+    assert 'Juniper Café' in copy and 'Fictional example' in copy
+    assert '$450' in copy and '$325 observed improvement' in copy and '$0 client-verified impact' in copy
+    assert 'href="/proof-ledger"' in home
     assert 'Profit Leak Score' in copy and 'Request a 20-minute fit call' in copy
     assert '14-Day Margin Recovery Diagnostic' in copy and '$1,500' in copy
     assert '/labor-review' in home
@@ -25,6 +27,8 @@ def test_demo_preserves_canonical_financial_contract_and_modules():
     assert 'FICTIONAL DEMO DATA' in shell
     compact=data.replace(' ','')
     assert 'modeledOpportunity:392570.56' in compact
+    proof = text('proof-ledger.html')
+    assert '$392,570.56' in proof and 'Verified Value' in proof
     assert 'annualized:102844.37' in compact
     assert "kind:'SUPPORTING'" in data and 'annualized:0' in data and 'NOT COUNTED TWICE' in data
     for route in ['command','morning','locations','labor','forecast','inventory','purchasing','food','revenue','opportunities','actions','results','reports','intelligence','alerts','data','expansion','scenarios','weekly','period-close']:
