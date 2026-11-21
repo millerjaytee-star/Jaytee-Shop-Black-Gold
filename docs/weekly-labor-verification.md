@@ -1,6 +1,6 @@
 # Weekly labor review verification
 
-For the later iPhone and staging changes, see the [rollout and release gates](stabilis-rollout.md). The evidence below describes the web revamp baseline.
+The evidence below describes the web revamp baseline. PR #15 later added optional associations to private originals, retained available role and daypart summaries, and generated a draft diagnostic readout and 90-day roadmap. Hosted staging verification and signed delivery are tracked in the [rollout and release gates](stabilis-rollout.md).
 
 ## Starting revisions
 
@@ -49,7 +49,7 @@ Open [the home page](http://127.0.0.1:8941/) or [the weekly labor review](http:/
 - Baseline forecast and actual sales are $10,000 and $9,000. Scheduled and paid labor are 125 hours/$2,500 and 135 hours/$2,700. At 25%, actual labor was 30%, five percentage points over target. The $450 historical variance is $0 from the schedule, $250 from the sales miss and $200 from payroll above schedule.
 - The following week uses $9,500 actual sales and 125 paid hours/$2,500. The variance is $125 and the observed change is $325. The fictional portfolio contains ten locations, $392,570.56 modeled opportunity and $0 Verified Value. HHR-07 overtime contributes $0 additional to the rollup.
 
-### Scope still to validate
+### Scope remaining at the web revamp baseline
 
 The new deploy preview and loopback server use a public-only browser configuration. Private browser verification uses PostgreSQL 17 and an isolated auth/REST test transport. The dedicated Stabilis Supabase project is inactive. Hosted sign-in, password recovery, live grant/schema preflight, deployment of the updated migration, private storage and report delivery require the authorized staging rehearsal before customer release.
 
